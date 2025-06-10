@@ -1,0 +1,53 @@
+#!/bin/bash
+
+set -eo pipefail
+
+if [ -t 0 ]; then
+	echo "ysonq: expected input from stdin"
+	exit 1
+fi
+
+# handle binary data
+INPUT="$(base64 -w 0)"
+
+if [ -z "$(echo $INPUT | base64 -d | tr -d '[[:space:]]\0')" ] ; then
+	echo "ysonq: empty stdin"
+	exit 1
+fi
+
+JSON="$(echo "$INPUT" |\
+		base64 -d |\
+		yson-convert -m y2j -f compact |\
+		jq -c "$@")"
+
+YSON_CONVERT_ARGS=""
+
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-c)
+			YSON_CONVERT_ARGS+=" -f compact"
+			shift # past argument
+			;;
+		*)
+			shift # past argument
+			;;
+	esac
+done
+
+if ! jq -reM '""' >/dev/null 2>&1 <<<"$JSON"; then
+	# jq produced something which is not JSON, so let's just roll with it
+	echo "$JSON"
+	exit 0
+fi
+
+echo "$JSON" |\
+jq -c 'walk(
+	if type == "object"
+	then with_entries(
+		if .key == "Attrs" then .key = "$attributes"
+		elif .key == "Value" then .key = "$value"
+		else . end
+	) else . end
+)' |\
+tr '\n' '\0' |\
+xargs -0 -L1 yson-convert -m j2y $YSON_CONVERT_ARGS
