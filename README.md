@@ -43,9 +43,9 @@ Note: JSON representation produced by y2j mode differs from JSON representation 
 
 A wrapper script for `jq` which converts input stream to JSON and back via `yson-convert`, effectively allowing to use `jq` with YSON with almost no downsides.
 
-By default, `ysonq` tries to convert `jq`'s output back to YSON / YSON*L*, but won't do so it if it seems impossible (i.e. -r string literals).
+By default, `ysonq` tries to convert `jq`'s output back to YSON / YSON*L*, but won't do so if it seems impossible (i.e. -r string literals).
 
-Some of `jq`'s flags (namely, --slurp and format/stream stuff) are not supported yet, I'd like to support them all eventually and I'm open for pull requests.
+Some of `jq`'s flags (namely, `--slurp` and format/stream stuff) are not supported yet, I'd like to support them all eventually and I'm open for pull requests.
 
 Examples :
 
