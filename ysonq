@@ -56,7 +56,7 @@ else
 fi
 
 JSON="$(echo "$JSON_SRC" |\
-		jq -c "$JQ_ARGS")"
+		jq -c "${JQ_ARGS[@]}")"
 
 if ! jq -reM '""' >/dev/null 2>&1 <<<"$JSON"; then
 	# jq produced something which is not JSON, so let's just roll with it
