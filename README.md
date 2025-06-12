@@ -4,7 +4,7 @@
 
 A tool to convert values between YSON and JSON.
 
-Installation: `go install`
+Installation: `go install github.com/lesf0/yson-tools/yson-convert@latest`
 
 Usage: `yson-convert [-m mode] [-f format] value` or `echo value | yson-convert [-m mode] [-f format]`
 
@@ -44,6 +44,8 @@ Note: JSON representation produced by y2j mode differs from JSON representation 
 A wrapper script for `jq` which converts input stream to JSON and back via `yson-convert`, effectively allowing to use `jq` with YSON with almost no downsides.
 
 By default, `ysonq` tries to convert `jq`'s output back to YSON / YSON*L*, but won't do so it if it seems impossible (i.e. -r string literals).
+
+Some of `jq`'s flags (namely, --slurp and format/stream stuff) are not supported yet, I'd like to support them all eventually and I'm open for pull requests.
 
 Examples :
 

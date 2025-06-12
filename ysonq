@@ -2,37 +2,61 @@
 
 set -eo pipefail
 
-if [ -t 0 ]; then
-	echo "ysonq: expected input from stdin"
-	exit 1
-fi
+JQ_ARGS=()
 
-# handle binary data
-INPUT="$(base64 -w 0)"
-
-if [ -z "$(echo $INPUT | base64 -d | tr -d '[[:space:]]\0')" ] ; then
-	echo "ysonq: empty stdin"
-	exit 1
-fi
-
-JSON="$(echo "$INPUT" |\
-		base64 -d |\
-		yson-convert -m y2j -f compact |\
-		jq -c "$@")"
-
-YSON_CONVERT_ARGS=""
+YSON_OUTPUT_ARGS=""
 
 while [[ $# -gt 0 ]]; do
 	case $1 in
-		-c)
-			YSON_CONVERT_ARGS+=" -f compact"
+		-n|--null-input)
+			NULL_INPUT=1
 			shift # past argument
 			;;
+		-R|--raw-input)
+			RAW_INPUT=1
+			JQ_ARGS+=("$1") # save positional arg
+			shift # past argument
+			;;
+		-c|--compact-output)
+			YSON_OUTPUT_ARGS+=" -f compact"
+			shift # past argument
+			;;
+		-s|--slurp|-a|--ascii-output|-C|--color-output|-M|--monochrome-output|--tab|--indent|--unbuffered|--stream|--stream-errors|--seq|-V|--version|--build-configuration|-h|--help)
+			echo "ysonq: $1 is not supported (yet)"
+			exit 1
+			;;
 		*)
+			JQ_ARGS+=("$1") # save positional arg
 			shift # past argument
 			;;
 	esac
 done
+
+if [ -z ${NULL_INPUT+x} ] && [ -z ${RAW_INPUT+x} ]; then
+	if [ -t 0 ]; then
+		echo "ysonq: expected input from stdinn"
+		exit 1
+	fi
+
+	# handle binary data
+	INPUT="$(base64 -w 0)"
+
+	if [ -z "$(echo $INPUT | base64 -d | tr -d '[[:space:]]\0')" ] ; then
+		echo "ysonq: empty stdin"
+		exit 1
+	fi
+
+	JSON_SRC="$(echo "$INPUT" |\
+		base64 -d |\
+		yson-convert -m y2j -f compact)"
+elif [ -z ${NULL_INPUT+x} ]; then
+	JSON_SRC="$(cat)"
+else
+	JSON_SRC="null"
+fi
+
+JSON="$(echo "$JSON_SRC" |\
+		jq -c "$JQ_ARGS")"
 
 if ! jq -reM '""' >/dev/null 2>&1 <<<"$JSON"; then
 	# jq produced something which is not JSON, so let's just roll with it
@@ -50,4 +74,4 @@ jq -c 'walk(
 	) else . end
 )' |\
 tr '\n' '\0' |\
-xargs -0 -L1 yson-convert -m j2y $YSON_CONVERT_ARGS
+xargs -0 -L1 yson-convert -m j2y $YSON_OUTPUT_ARGS
