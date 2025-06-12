@@ -135,5 +135,6 @@ jq -c 'walk(
 		else . end
 	) else . end
 )' |\
-tr '\n' '\0' |\
-xargs -0 -L1 yson-convert -m j2y $YSON_OUTPUT_ARGS
+while read ; do 
+	echo "$REPLY" | yson-convert -m j2y $YSON_OUTPUT_ARGS
+done
