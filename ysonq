@@ -21,16 +21,78 @@ while [[ $# -gt 0 ]]; do
 			YSON_OUTPUT_ARGS+=" -f compact"
 			shift # past argument
 			;;
+		-f|--from-file|-L)
+			JQ_ARGS+=("$1") # save positional arg
+			JQ_ARGS+=("$2") # save value
+			shift # past argument
+			shift # past value
+			;;
+		--arg|--argjson|--slurpfile|--rawfile)
+			JQ_ARGS+=("$1") # save positional arg
+			JQ_ARGS+=("$2") # save name
+			JQ_ARGS+=("$3") # save value
+			shift # past argument
+			shift # past name
+			shift # past value
+			;;
 		-s|--slurp|-a|--ascii-output|-C|--color-output|-M|--monochrome-output|--tab|--indent|--unbuffered|--stream|--stream-errors|--seq|-V|--version|--build-configuration|-h|--help)
 			echo "ysonq: $1 is not supported (yet)"
 			exit 1
 			;;
-		*)
+		--argyson)
+			JQ_ARGS+=("--argjson") # save positional arg
+			JQ_ARGS+=("$2") # save name
+			JQ_ARGS+=("$(yson-convert -m y2j -f compact "$3")") # save value
+			shift # past argument
+			shift # past name
+			shift # past value
+			;;
+		--ysonargs)
+			HAS_YSONARGS=1
+			JQ_ARGS+=("--jsonargs") # save positional arg
+			shift # past argument
+			;;
+		--*args)
+			HAS_ARGS=1
 			JQ_ARGS+=("$1") # save positional arg
 			shift # past argument
 			;;
+		--)
+			break
+			;;
+		-*)
+			JQ_ARGS+=("$1") # save positional arg
+			shift # past argument
+			;;
+		*)
+			if [ ! -z ${FILTER+x} ]; then
+				break; # we've found 
+			else
+				FILTER=1
+				JQ_ARGS+=("$1") # save positional arg
+				shift # past argument
+			fi
+			;;
 	esac
 done
+
+if [ ! -z ${HAS_YSONARGS+x} ]; then
+	if [ ! -z ${HAS_ARGS+x} ]; then
+		echo "ysonq: cannot have jq args and ysonq args at the same time"
+		exit 1
+	fi
+
+	while [[ $# -gt 0 ]]; do
+		if [[ "$1" == "--" ]] ; then
+			JQ_ARGS+=("$1")
+			shift
+			continue
+		fi
+
+		JQ_ARGS+=("$(yson-convert -m y2j -f compact "$1")")
+		shift
+	done
+fi
 
 if [ -z ${NULL_INPUT+x} ] && [ -z ${RAW_INPUT+x} ]; then
 	if [ -t 0 ]; then
@@ -56,7 +118,7 @@ else
 fi
 
 JSON="$(echo "$JSON_SRC" |\
-		jq -c "${JQ_ARGS[@]}")"
+		jq -c "${JQ_ARGS[@]}" "$@")"
 
 if ! jq -reM '""' >/dev/null 2>&1 <<<"$JSON"; then
 	# jq produced something which is not JSON, so let's just roll with it

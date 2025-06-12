@@ -92,4 +92,12 @@ $ echo "{foo={bar=<q=e>%true;baz=qqq}}" | ysonq -c '.foo'
 $ echo "[<q=w>e;<r=t>y]" | ysonq -c '.[]'
 <q=w;>e
 <r=t;>y
+
+# --ysonargs
+$ ysonq -n --ysonargs '$ARGS.positional' -c '[foo;bar;]' '%false' '9'
+[[foo;bar;];%false;9;]
+
+# --argyson
+$ ysonq -n '$ARGS.named' -c --argyson first '[foo;bar;]' --argyson second '%false' --argyson third '9'
+{first=[foo;bar;];second=%false;third=9;}
 ```
