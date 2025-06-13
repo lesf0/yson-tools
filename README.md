@@ -98,12 +98,12 @@ $ echo "[<q=w>e;<r=t>y]" | ysonq -c '.[]'
 <r=t;>y
 
 # --ysonargs
-$ ysonq -n --ysonargs '$ARGS.positional' -c '[foo;bar;]' '%false' '9'
-[[foo;bar;];%false;9;]
+$ ysonq -n --ysonargs '$ARGS.positional' -c '[foo;bar;]' '%false' '<q=e>#'
+[[foo;bar;];%false;<q=e;>#;]
 
 # --argyson
-$ ysonq -n '$ARGS.named' -c --argyson first '[foo;bar;]' --argyson second '%false' --argyson third '9'
-{first=[foo;bar;];second=%false;third=9;}
+$ ysonq -n '$ARGS.named' -c --argyson first '[foo;bar;]' --argyson second '%false' --argyson third '<q=e>#'
+{first=[foo;bar;];second=%false;third=<q=e;>#;}
 
 # --slurp
 $ seq 1 5 | ysonq -s
