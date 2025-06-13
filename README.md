@@ -77,7 +77,7 @@ r
 t
 y
 
-# JSONL (will be represented as YSONL, although YSONL is not really a thing and won't be parsed back)
+# JSONL (will be represented as YSONL, which is not really a thing but will be parsed back)
 $ echo "[<q=w>e;<r=t>y]" | ysonq '.[]'
 <
     q=w;
