@@ -6,7 +6,7 @@ A tool to convert values between YSON and JSON.
 
 Installation: `go install github.com/lesf0/yson-tools/yson-convert@latest`
 
-Usage: `yson-convert [-m mode] [-f format] value` or `echo value | yson-convert [-m mode] [-f format]`
+Usage: `yson-convert [-m mode] [-f format] [-seq] value` or `echo value | yson-convert [-m mode] [-f format] [-seq]`
 
 Modes:
 
@@ -20,6 +20,10 @@ Formats:
 - pretty [default]: print YSON/JSON text form with intendations
 - compact: print YSON/JSON text form in one line
 - binary: print YSON binary form, won't work with JSON
+
+Sequence of YSON (aka YSONL):
+
+`-seq` flag allows to parse a sequence of YSON/JSON values rather than a singular YSON/JSON value. It uses binary search to determine the bounds of separate objects and is not *that* effective, but it works.
 
 Example: 
 ```bash
@@ -45,7 +49,7 @@ A wrapper script for `jq` which converts input stream to JSON and back via `yson
 
 By default, `ysonq` tries to convert `jq`'s output back to YSON / YSON*L*, but won't do so if it seems impossible (i.e. -r string literals).
 
-Some of `jq`'s flags (namely, `--slurp` and format/stream stuff) are not supported yet, I'd like to support them all eventually and I'm open for pull requests.
+Some of `jq`'s flags (namely, format/stream stuff) are not supported yet, I'd like to support them all eventually and I'm open for pull requests.
 
 Examples :
 
@@ -100,4 +104,14 @@ $ ysonq -n --ysonargs '$ARGS.positional' -c '[foo;bar;]' '%false' '9'
 # --argyson
 $ ysonq -n '$ARGS.named' -c --argyson first '[foo;bar;]' --argyson second '%false' --argyson third '9'
 {first=[foo;bar;];second=%false;third=9;}
+
+# --slurp
+$ seq 1 5 | ysonq -s
+[
+    1;
+    2;
+    3;
+    4;
+    5;
+]
 ```

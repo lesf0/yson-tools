@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -euo pipefail
 
 JQ_ARGS=()
 
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
 			shift # past name
 			shift # past value
 			;;
-		-s|--slurp|-a|--ascii-output|-C|--color-output|-M|--monochrome-output|--tab|--indent|--unbuffered|--stream|--stream-errors|--seq|-V|--version|--build-configuration|-h|--help)
+		-a|--ascii-output|-C|--color-output|-M|--monochrome-output|--tab|--indent|--unbuffered|--stream|--stream-errors|--seq|-V|--version|--build-configuration|-h|--help)
 			echo "ysonq: $1 is not supported (yet)"
 			exit 1
 			;;
@@ -110,7 +110,7 @@ if [ -z ${NULL_INPUT+x} ] && [ -z ${RAW_INPUT+x} ]; then
 
 	JSON_SRC="$(echo "$INPUT" |\
 		base64 -d |\
-		yson-convert -m y2j -f compact)"
+		yson-convert -seq -m y2j -f compact)"
 elif [ -z ${NULL_INPUT+x} ]; then
 	JSON_SRC="$(cat)"
 else
@@ -126,6 +126,11 @@ if ! jq -reM '""' >/dev/null 2>&1 <<<"$JSON"; then
 	exit 0
 fi
 
+if [ "$(echo "$JSON" | grep . | wc -l)" -ne 1 ]; then
+	# let's try to read this as a sequence of JSON's
+	YSON_OUTPUT_ARGS+=" -seq"
+fi
+
 echo "$JSON" |\
 jq -c 'walk(
 	if type == "object"
@@ -135,6 +140,4 @@ jq -c 'walk(
 		else . end
 	) else . end
 )' |\
-while read ; do 
-	echo "$REPLY" | yson-convert -m j2y $YSON_OUTPUT_ARGS
-done
+yson-convert -m j2y $YSON_OUTPUT_ARGS

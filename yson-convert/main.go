@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -29,6 +30,14 @@ func fromYson(s []byte) (any, error) {
 	var ysonData any
 	err := yson.Unmarshal(s, &ysonData)
 
+	if err != nil {
+		if serr, ok := err.(*yson.SyntaxError); ok {
+			if serr.Message == "unexpected end of YSON input" {
+				return nil, io.ErrUnexpectedEOF
+			}
+		}
+	}
+
 	return ysonData, err
 }
 
@@ -46,6 +55,11 @@ func toYson(d any, format string) (string, error) {
 	}
 	result, err := yson.MarshalFormat(d, ysonFormat)
 	if err != nil {
+		// dirty...
+		if err.Error() == "failed to parse value with attributes: EOF" || err.Error() == "failed to parse value with attributes: unexpected EOF" {
+			return "", io.EOF
+		}
+
 		return "", err
 	}
 	return string(result), nil
@@ -120,6 +134,8 @@ func main() {
 	flag.StringVar(&format, "format", defaultFormat, "format")
 	flag.StringVar(&format, "f", defaultFormat, "format (shorthand)")
 
+	readAsSeq := flag.Bool("seq", false, "attempt to read the input as a sequence of (Y/J)SON's")
+
 	flag.Parse()
 
 	var input []byte
@@ -152,10 +168,53 @@ func main() {
 		}
 	}
 
-	result, err := apply(input, mode, format)
-	if err != nil {
-		panic(fmt.Errorf("conversion resulted in error: %v", err))
-	}
+	if !*readAsSeq {
+		result, err := apply(input, mode, format)
+		if err != nil {
+			panic(fmt.Errorf("conversion resulted in error: %v", err))
+		}
 
-	fmt.Println(result)
+		fmt.Println(result)
+	} else {
+		// if it's stupid but it works it's not stupid
+		ok := false
+		var lastErr error
+
+		for len(input) != 0 {
+			var result string
+
+			start, mid, end := 1, 1, len(input)
+			for start < end {
+				mid = (start + end) >> 1
+				_, err := apply(input[:mid], mode, format)
+
+				if err == nil {
+					end = mid
+				} else if err == io.ErrUnexpectedEOF || err == io.EOF {
+					start = mid + 1
+				} else {
+					end = mid - 1
+				}
+			}
+
+			result, err := apply(input[:end], mode, format)
+			input = input[end:]
+
+			if err == nil {
+				fmt.Println(result)
+				ok = true
+			} else {
+				if len(bytes.TrimSpace(input)) > 0 {
+					panic(fmt.Errorf("illegal characters at the end of input"))
+				}
+
+				lastErr = err
+				break
+			}
+		}
+
+		if !ok {
+			panic(fmt.Errorf("unable to parse input: %v", lastErr))
+		}
+	}
 }
