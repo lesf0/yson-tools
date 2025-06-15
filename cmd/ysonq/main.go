@@ -21,7 +21,7 @@ func main() {
 		panic(err)
 	}
 
-	query, err := gojq.Parse(".")
+	query, err := gojq.Parse(".[] | @csv")
 	if err != nil {
 		panic(err)
 	}

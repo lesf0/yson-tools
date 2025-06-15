@@ -11,8 +11,8 @@ func NormalizeYSON(v any) any {
 	switch v := v.(type) {
 	case *yson.ValueWithAttrs:
 		return map[string]any{
-			valueKey: v.Value,
-			attrsKey: v.Attrs,
+			valueKey: NormalizeYSON(v.Value),
+			attrsKey: NormalizeYSON(v.Attrs),
 		}
 	case []any:
 		for i, x := range v {
@@ -43,8 +43,8 @@ func DenormalizeYSON(v any) any {
 
 		if hasValue && hasAttrs {
 			return &yson.ValueWithAttrs{
-				Value: value,
-				Attrs: attrs.(map[string]any),
+				Value: DenormalizeYSON(value),
+				Attrs: DenormalizeYSON(attrs).(map[string]any),
 			}
 		}
 
