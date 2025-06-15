@@ -4,7 +4,7 @@
 
 A tool to convert values between YSON and JSON.
 
-Installation: `go install github.com/lesf0/yson-tools/yson-convert@latest`
+Installation: `go install github.com/lesf0/yson-tools@latest`
 
 Usage: `yson-convert [-m mode] [-f format] value` or `echo value | yson-convert [-m mode] [-f format]`
 
