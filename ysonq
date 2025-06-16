@@ -103,7 +103,7 @@ if [ -z ${NULL_INPUT+x} ] && [ -z ${RAW_INPUT+x} ]; then
 	# handle binary data
 	INPUT="$(base64 -w 0)"
 
-	if [ -z "$(echo $INPUT | base64 -d | tr -d '[[:space:]]\0')" ] ; then
+	if [ -z "$(echo $INPUT | base64 -d | tr -d '[:space:]\0')" ] ; then
 		echo "ysonq: empty stdin"
 		exit 1
 	fi
