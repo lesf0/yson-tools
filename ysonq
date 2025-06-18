@@ -126,10 +126,19 @@ if ! jq -reM '""' >/dev/null 2>&1 <<<"$JSON"; then
 	exit 0
 fi
 
-if [ "$(echo "$JSON" | grep . | wc -l)" -ne 1 ]; then
-	# let's try to read this as a sequence of JSON's
-	YSON_OUTPUT_ARGS+=" -seq"
-fi
+case "$(echo "$JSON" | grep . | wc -l)" in
+	0)
+		# empty output
+		exit 0
+		;;
+	1)
+		# single JSON, just continue
+		;;
+	*)
+		# let's try to read this as a sequence of JSON's
+		YSON_OUTPUT_ARGS+=" -seq"
+		;;
+esac
 
 echo "$JSON" |\
 jq -c 'walk(
