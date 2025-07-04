@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
 		--argyson)
 			JQ_ARGS+=("--argjson") # save positional arg
 			JQ_ARGS+=("$2") # save name
-			JQ_ARGS+=("$(yson-convert -m y2j -f compact "$3")") # save value
+			JQ_ARGS+=("$(echo "$3" | yson-convert -m y2j -f compact)") # save value
 			shift # past argument
 			shift # past name
 			shift # past value
