@@ -23,6 +23,7 @@ const defaultMode = guessMode
 const prettyFormat = "pretty"
 const compactFormat = "compact"
 const binaryFormat = "binary"
+const pythonFormat = "python"
 
 const defaultFormat = prettyFormat
 
@@ -42,6 +43,11 @@ func fromYson(s []byte) (any, error) {
 }
 
 func toYson(d any, format string) (string, error) {
+	if format == "python" {
+		formatter := NewYsonFormatter()
+		return formatter.Dump(d), nil
+	}
+
 	var ysonFormat yson.Format
 	switch format {
 	case prettyFormat:
