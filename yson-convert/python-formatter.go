@@ -4,24 +4,30 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
 	"go.ytsaurus.tech/yt/go/yson"
 )
 
+// YsonFormatter represents a formatter for YSON serialization
 type YsonFormatter struct {
-	buffer *bytes.Buffer
-	indent string
+	buffer   *bytes.Buffer
+	indent   string
+	sortKeys bool
 }
 
-func NewYsonFormatter() *YsonFormatter {
+// NewYsonFormatter creates an instance of YsonFormatter
+func NewYsonFormatter(indent int, sortKeys bool) *YsonFormatter {
 	return &YsonFormatter{
-		buffer: &bytes.Buffer{},
-		indent: "  ",
+		buffer:   &bytes.Buffer{},
+		indent:   strings.Repeat(" ", indent),
+		sortKeys: sortKeys,
 	}
 }
 
+// Dump serializes an object to YSON format
 func (y *YsonFormatter) Dump(obj interface{}) string {
 	y.writeValue(obj, 0)
 	return y.buffer.String()
@@ -51,7 +57,6 @@ func (y *YsonFormatter) writeValue(v interface{}, level int) {
 	case reflect.Map:
 		y.writeMap(rv.Interface(), level)
 	case reflect.Ptr:
-		// Handle *yson.ValueWithAttrs specifically
 		if rv.Type() == reflect.TypeOf(&yson.ValueWithAttrs{}) {
 			y.writeValueWithAttributes(rv.Interface().(*yson.ValueWithAttrs), level)
 		} else {
@@ -82,7 +87,6 @@ func (y *YsonFormatter) writeString(s string) {
 }
 
 func escapeString(s string) string {
-	// Correctly escape the string to handle YSON-compatible formatting
 	var buf strings.Builder
 	for _, r := range s {
 		switch r {
@@ -122,12 +126,19 @@ func (y *YsonFormatter) writeList(v interface{}, level int) {
 func (y *YsonFormatter) writeMap(v interface{}, level int) {
 	y.buffer.WriteString("{\n")
 
-	keys := reflect.ValueOf(v).MapKeys()
+	mapValue := reflect.ValueOf(v)
+	keys := mapValue.MapKeys()
+	if y.sortKeys {
+		sort.Slice(keys, func(i, j int) bool {
+			return fmt.Sprint(keys[i].Interface()) < fmt.Sprint(keys[j].Interface())
+		})
+	}
+
 	for _, key := range keys {
 		y.writeIndent(level + 1)
 		y.writeValue(key.Interface(), level+1)
 		y.buffer.WriteString(" = ")
-		y.writeValue(reflect.ValueOf(v).MapIndex(key).Interface(), level+1)
+		y.writeValue(mapValue.MapIndex(key).Interface(), level+1)
 		y.buffer.WriteString(";\n")
 	}
 

@@ -43,8 +43,8 @@ func fromYson(s []byte) (any, error) {
 }
 
 func toYson(d any, format string) (string, error) {
-	if format == "python" {
-		formatter := NewYsonFormatter()
+	if format == pythonFormat {
+		formatter := NewYsonFormatter(4, true)
 		return formatter.Dump(d), nil
 	}
 

@@ -21,6 +21,10 @@ while [[ $# -gt 0 ]]; do
 			YSON_OUTPUT_ARGS+=" -f compact"
 			shift # past argument
 			;;
+		-P|--python-style-output)
+			YSON_OUTPUT_ARGS+="| yson-convert -m pretty -f python"
+			shift # past argument
+			;;
 		-f|--from-file|-L)
 			JQ_ARGS+=("$1") # save positional arg
 			JQ_ARGS+=("$2") # save value
@@ -149,4 +153,4 @@ jq -c 'walk(
 		else . end
 	) else . end
 )' |\
-yson-convert -m j2y $YSON_OUTPUT_ARGS
+bash -c "yson-convert -m j2y $YSON_OUTPUT_ARGS"
