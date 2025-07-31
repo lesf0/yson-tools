@@ -20,6 +20,7 @@ Formats:
 - pretty [default]: print YSON/JSON text form with intendations
 - compact: print YSON/JSON text form in one line
 - binary: print YSON binary form, won't work with JSON
+- python: print YSON text form python-style (differs from default go formatter), won't work with JSON
 
 Sequence of YSON (aka YSONL):
 
