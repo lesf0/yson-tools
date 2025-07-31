@@ -140,7 +140,7 @@ case "$(echo "$JSON" | grep . | wc -l)" in
 		;;
 	*)
 		# let's try to read this as a sequence of JSON's
-		YSON_OUTPUT_ARGS+=" -seq"
+		YSON_OUTPUT_ARGS=" -seq$YSON_OUTPUT_ARGS -seq"
 		;;
 esac
 
