@@ -124,10 +124,16 @@ func (y *YsonFormatter) writeList(v interface{}, level int) {
 }
 
 func (y *YsonFormatter) writeMap(v interface{}, level int) {
-	y.buffer.WriteString("{\n")
-
 	mapValue := reflect.ValueOf(v)
 	keys := mapValue.MapKeys()
+
+	if len(keys) == 0 {
+		y.buffer.WriteString("{}")
+		return
+	}
+
+	y.buffer.WriteString("{\n")
+
 	if y.sortKeys {
 		sort.Slice(keys, func(i, j int) bool {
 			return fmt.Sprint(keys[i].Interface()) < fmt.Sprint(keys[j].Interface())
