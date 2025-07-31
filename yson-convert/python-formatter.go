@@ -154,8 +154,24 @@ func (y *YsonFormatter) writeMap(v interface{}, level int) {
 
 func (y *YsonFormatter) writeValueWithAttributes(v *yson.ValueWithAttrs, level int) {
 	y.buffer.WriteString("<\n")
-	y.writeIndent(level + 1)
-	y.writeMap(v.Attrs, level+1)
+	mapValue := reflect.ValueOf(v.Attrs)
+	keys := mapValue.MapKeys()
+
+	if y.sortKeys {
+		sort.Slice(keys, func(i, j int) bool {
+			return fmt.Sprint(keys[i].Interface()) < fmt.Sprint(keys[j].Interface())
+		})
+	}
+
+	for _, key := range keys {
+		y.writeIndent(level + 1)
+		y.writeValue(key.Interface(), level+1)
+		y.buffer.WriteString(" = ")
+		y.writeValue(mapValue.MapIndex(key).Interface(), level+1)
+		y.buffer.WriteString(";\n")
+	}
+
+	y.writeIndent(level)
 	y.buffer.WriteString(">\n")
 	y.writeIndent(level)
 	y.writeValue(v.Value, level)

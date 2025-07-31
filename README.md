@@ -114,4 +114,16 @@ $ seq 1 5 | ysonq -s
     4;
     5;
 ]
+
+# --python-style-output (forced sort by key, forced quoted strings, different intents)
+$ echo "{aaa={ccc=<q=e>%true;bbb=qqq}}" | ysonq -P '.'
+{
+    "aaa" = {
+        "bbb" = "qqq";
+        "ccc" = <
+            "q" = "e";
+        >
+        %true;
+    };
+}
 ```
