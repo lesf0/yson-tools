@@ -25,6 +25,7 @@ const prettyFormat = "pretty"
 const compactFormat = "compact"
 const binaryFormat = "binary"
 const pythonFormat = "python"
+const coloredFormat = "colored"
 
 const defaultFormat = prettyFormat
 
@@ -44,8 +45,8 @@ func fromYson(s []byte) (any, error) {
 }
 
 func toYson(d any, format string) (string, error) {
-	if format == pythonFormat {
-		formatter := NewYsonFormatter(4, true)
+	if format == pythonFormat || format == coloredFormat {
+		formatter := NewYsonFormatter(4, true, format == coloredFormat)
 		return formatter.Dump(d), nil
 	}
 

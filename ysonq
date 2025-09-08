@@ -25,6 +25,14 @@ while [[ $# -gt 0 ]]; do
 			YSON_OUTPUT_ARGS+="| yson-convert -m pretty -f python"
 			shift # past argument
 			;;
+		-C|--color-output)
+			YSON_OUTPUT_ARGS+="| yson-convert -m pretty -f colored"
+			shift # past argument
+			;;
+		-M|--monochrome-output)
+			# already monochrome by default
+			shift # past argument
+			;;
 		-f|--from-file|-L)
 			JQ_ARGS+=("$1") # save positional arg
 			JQ_ARGS+=("$2") # save value
@@ -39,7 +47,7 @@ while [[ $# -gt 0 ]]; do
 			shift # past name
 			shift # past value
 			;;
-		-a|--ascii-output|-C|--color-output|-M|--monochrome-output|--tab|--indent|--unbuffered|--stream|--stream-errors|--seq|-V|--version|--build-configuration|-h|--help)
+		-a|--ascii-output|--tab|--indent|--unbuffered|--stream|--stream-errors|--seq|-V|--version|--build-configuration|-h|--help)
 			echo "ysonq: $1 is not supported (yet)"
 			exit 1
 			;;
