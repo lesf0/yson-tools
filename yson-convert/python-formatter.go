@@ -172,7 +172,7 @@ func (y *YsonFormatter) writeValueWithAttributes(v *yson.ValueWithAttrs, level i
 	}
 
 	y.writeIndent(level)
-	y.buffer.WriteString(">\n")
+	y.buffer.WriteString("> ")
 	y.writeIndent(level)
 	y.writeValue(v.Value, level)
 }
