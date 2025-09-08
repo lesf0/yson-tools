@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/andrew-d/go-termutil"
 	"go.ytsaurus.tech/yt/go/yson"
@@ -131,6 +132,56 @@ func apply(input []byte, mode string, format string) (string, error) {
 	}
 }
 
+func handle(input []byte, mode string, format string, readAsSeq bool) (string, error) {
+	if !readAsSeq {
+		return apply(input, mode, format)
+	} else {
+		// if it's stupid but it works it's not stupid
+		var results []string
+		ok := false
+		var lastErr error
+
+		for len(input) != 0 {
+			var result string
+
+			start, mid, end := 1, 1, len(input)
+			for start < end {
+				mid = (start + end) >> 1
+				_, err := apply(input[:mid], mode, format)
+
+				if err == nil {
+					end = mid
+				} else if err == io.ErrUnexpectedEOF || err == io.EOF {
+					start = mid + 1
+				} else {
+					end = mid - 1
+				}
+			}
+
+			result, err := apply(input[:end], mode, format)
+			input = input[end:]
+
+			if err == nil {
+				results = append(results, result)
+				ok = true
+			} else {
+				if len(bytes.TrimSpace(input)) > 0 {
+					return "", fmt.Errorf("illegal characters at the end of input")
+				}
+
+				lastErr = err
+				break
+			}
+		}
+
+		if !ok {
+			return "", fmt.Errorf("unable to parse input: %v", lastErr)
+		}
+
+		return strings.Join(results, "\n"), nil
+	}
+}
+
 func main() {
 	var mode string
 	flag.StringVar(&mode, "mode", defaultMode, "work mode")
@@ -174,53 +225,9 @@ func main() {
 		}
 	}
 
-	if !*readAsSeq {
-		result, err := apply(input, mode, format)
-		if err != nil {
-			panic(fmt.Errorf("conversion resulted in error: %v", err))
-		}
-
-		fmt.Println(result)
-	} else {
-		// if it's stupid but it works it's not stupid
-		ok := false
-		var lastErr error
-
-		for len(input) != 0 {
-			var result string
-
-			start, mid, end := 1, 1, len(input)
-			for start < end {
-				mid = (start + end) >> 1
-				_, err := apply(input[:mid], mode, format)
-
-				if err == nil {
-					end = mid
-				} else if err == io.ErrUnexpectedEOF || err == io.EOF {
-					start = mid + 1
-				} else {
-					end = mid - 1
-				}
-			}
-
-			result, err := apply(input[:end], mode, format)
-			input = input[end:]
-
-			if err == nil {
-				fmt.Println(result)
-				ok = true
-			} else {
-				if len(bytes.TrimSpace(input)) > 0 {
-					panic(fmt.Errorf("illegal characters at the end of input"))
-				}
-
-				lastErr = err
-				break
-			}
-		}
-
-		if !ok {
-			panic(fmt.Errorf("unable to parse input: %v", lastErr))
-		}
+	result, err := handle(input, mode, format, *readAsSeq)
+	if err != nil {
+		panic(fmt.Errorf("conversion resulted in error: %v", err))
 	}
+	fmt.Println(result)
 }
