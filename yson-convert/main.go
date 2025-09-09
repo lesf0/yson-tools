@@ -12,6 +12,7 @@ import (
 	"github.com/andrew-d/go-termutil"
 	"go.ytsaurus.tech/yt/go/yson"
 	"go.ytsaurus.tech/yt/go/yson/yson2json"
+	"golang.org/x/term"
 )
 
 const guessMode = "guess"
@@ -24,8 +25,6 @@ const defaultMode = guessMode
 const prettyFormat = "pretty"
 const compactFormat = "compact"
 const binaryFormat = "binary"
-const pythonFormat = "python"
-const coloredFormat = "colored"
 
 const defaultFormat = prettyFormat
 
@@ -45,8 +44,8 @@ func fromYson(s []byte) (any, error) {
 }
 
 func toYson(d any, format string) (string, error) {
-	if format == pythonFormat || format == coloredFormat {
-		formatter := NewYsonFormatter(4, true, format == coloredFormat)
+	if format == prettyFormat {
+		formatter := NewYsonFormatter(4, true, term.IsTerminal(int(os.Stdout.Fd())))
 		return formatter.Dump(d), nil
 	}
 
