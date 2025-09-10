@@ -71,13 +71,7 @@ func fromJson(s []byte) (any, error) {
 	var jsonData any
 	err := json.Unmarshal(s, &jsonData)
 
-	if err != nil {
-		if serr, ok := err.(*json.SyntaxError); ok {
-			if serr.Error() == "unexpected end of JSON input" || serr.Error() == "invalid character ' ' after decimal point in numeric literal" || strings.HasPrefix(serr.Error(), "invalid character ' ' in literal") {
-				return nil, io.ErrUnexpectedEOF
-			}
-		}
-	} else {
+	if err == nil {
 		jsonData = DenormalizeYSON(jsonData)
 	}
 
@@ -136,6 +130,38 @@ func apply(input []byte, mode string, format string) (string, error) {
 	}
 }
 
+func seek(input []byte, mode string) int {
+	switch mode {
+	case prettifyMode, yson2jsonMode:
+		start, mid, end := 1, 1, len(input)
+		for start < end {
+			mid = (start + end) >> 1
+			_, err := apply(input[:mid], mode, compactFormat)
+
+			switch err {
+			case nil:
+				end = mid
+			case io.ErrUnexpectedEOF, io.EOF:
+				start = mid + 1
+			default:
+				end = mid - 1
+			}
+		}
+		return end
+	case json2ysonMode:
+		_, err := fromJson(input)
+		if err != nil {
+			if serr, ok := err.(*json.SyntaxError); ok {
+				return int(serr.Offset) - 1
+			}
+		}
+		return len(input)
+
+	default:
+		panic(fmt.Errorf("seek is not implemented for %s mode", mode))
+	}
+}
+
 func handle(input []byte, mode string, format string, readAsSeq bool) (string, error) {
 	if !readAsSeq {
 		return apply(input, mode, format)
@@ -148,19 +174,7 @@ func handle(input []byte, mode string, format string, readAsSeq bool) (string, e
 		for len(input) != 0 {
 			var result string
 
-			start, mid, end := 1, 1, len(input)
-			for start < end {
-				mid = (start + end) >> 1
-				_, err := apply(input[:mid], mode, format)
-
-				if err == nil {
-					end = mid
-				} else if err == io.ErrUnexpectedEOF || err == io.EOF {
-					start = mid + 1
-				} else {
-					end = mid - 1
-				}
-			}
+			end := seek(input, mode)
 
 			result, err := apply(input[:end], mode, format)
 			input = input[end:]
