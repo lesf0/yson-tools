@@ -12,7 +12,7 @@ func TestPythonFormat(t *testing.T) {
     };
 }`
 
-	actual, err := handle([]byte("{foo={bar=<q=e>%true;baz=qqq}}"), "pretty", "python", false)
+	actual, err := handle([]byte("{foo={bar=<q=e>%true;baz=qqq}}"), "pretty", "pretty", false)
 
 	if err != nil {
 		t.Errorf("Should not produce an error")

@@ -8,10 +8,10 @@ import (
 	"io"
 	"os"
 	"strings"
+	"testing"
 
 	"github.com/andrew-d/go-termutil"
 	"go.ytsaurus.tech/yt/go/yson"
-	"go.ytsaurus.tech/yt/go/yson/yson2json"
 	"golang.org/x/term"
 )
 
@@ -45,39 +45,36 @@ func fromYson(s []byte) (any, error) {
 
 func toYson(d any, format string) (string, error) {
 	if format == prettyFormat {
-		formatter := NewYsonFormatter(4, true, term.IsTerminal(int(os.Stdout.Fd())))
+		_, mono := os.LookupEnv("YSON_NO_COLOR")
+		formatter := NewYsonFormatter(4, true, !mono && !testing.Testing() && term.IsTerminal(int(os.Stdout.Fd())))
 		return formatter.Dump(d), nil
 	}
 
 	var ysonFormat yson.Format
 	switch format {
-	case prettyFormat:
-		ysonFormat = yson.FormatPretty
 	case compactFormat:
 		ysonFormat = yson.FormatText
 	case binaryFormat:
 		ysonFormat = yson.FormatBinary
 	default:
-		panic(fmt.Errorf("unrecognized yson format: %v", format))
+		panic(fmt.Errorf("unexpected yson format: %v", format))
 	}
 	result, err := yson.MarshalFormat(d, ysonFormat)
 	if err != nil {
-		// dirty...
-		if err.Error() == "failed to parse value with attributes: EOF" || err.Error() == "failed to parse value with attributes: unexpected EOF" {
-			return "", io.EOF
-		}
-
 		return "", err
 	}
 	return string(result), nil
 }
 
 func fromJson(s []byte) (any, error) {
-	return yson2json.RawMessage{
-		JSON:      s,
-		UseInt64:  true,
-		UseUint64: true,
-	}, nil
+	var jsonData any
+	err := json.Unmarshal(s, &jsonData)
+
+	if err == nil {
+		DenormalizeYSON(jsonData)
+	}
+
+	return jsonData, err
 }
 
 func toJson(d any, format string) (string, error) {

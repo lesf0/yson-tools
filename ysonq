@@ -21,12 +21,8 @@ while [[ $# -gt 0 ]]; do
 			YSON_OUTPUT_ARGS+=" -f compact"
 			shift # past argument
 			;;
-		-P|--python-style-output)
-			YSON_OUTPUT_ARGS+="| yson-convert -m pretty -f python"
-			shift # past argument
-			;;
 		-C|--color-output)
-			YSON_OUTPUT_ARGS+="| yson-convert -m pretty -f colored"
+			YSON_NO_COLOR=1
 			shift # past argument
 			;;
 		-M|--monochrome-output)
@@ -148,17 +144,8 @@ case "$(echo "$JSON" | grep . | wc -l)" in
 		;;
 	*)
 		# let's try to read this as a sequence of JSON's
-		YSON_OUTPUT_ARGS=" -seq$YSON_OUTPUT_ARGS -seq"
+		YSON_OUTPUT_ARGS+=" -seq"
 		;;
 esac
 
-echo "$JSON" |\
-jq -c 'walk(
-	if type == "object"
-	then with_entries(
-		if .key == "Attrs" then .key = "$attributes"
-		elif .key == "Value" then .key = "$value"
-		else . end
-	) else . end
-)' |\
-bash -c "yson-convert -m j2y $YSON_OUTPUT_ARGS"
+echo "$JSON" | yson-convert -m j2y $YSON_OUTPUT_ARGS"
