@@ -73,7 +73,8 @@ func fromJson(s []byte) (any, error) {
 
 	if err != nil {
 		if serr, ok := err.(*json.SyntaxError); ok {
-			if serr.Error() == "unexpected end of JSON input" {
+			fmt.Println(serr.Error())
+			if serr.Error() == "unexpected end of JSON input" || serr.Error() == "invalid character ' ' after decimal point in numeric literal" {
 				return nil, io.ErrUnexpectedEOF
 			}
 		}
