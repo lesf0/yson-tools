@@ -71,8 +71,14 @@ func fromJson(s []byte) (any, error) {
 	var jsonData any
 	err := json.Unmarshal(s, &jsonData)
 
-	if err == nil {
-		DenormalizeYSON(jsonData)
+	if err != nil {
+		if serr, ok := err.(*json.SyntaxError); ok {
+			if serr.Error() == "unexpected end of JSON input" {
+				return nil, io.ErrUnexpectedEOF
+			}
+		}
+	} else {
+		jsonData = DenormalizeYSON(jsonData)
 	}
 
 	return jsonData, err
