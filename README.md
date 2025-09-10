@@ -20,7 +20,6 @@ Formats:
 - pretty [default]: print YSON/JSON text form with intendations
 - compact: print YSON/JSON text form in one line
 - binary: print YSON binary form, won't work with JSON
-- python: print YSON text form python-style (differs from default go formatter), won't work with JSON
 
 Sequence of YSON (aka YSONL):
 
@@ -58,16 +57,15 @@ Examples :
 # Get field by path
 $ echo "{foo={bar=<q=e>%true;baz=qqq}}" | ysonq '.foo'
 {
-    bar=<
-        q=e;
-    >
-    %true;
-    baz=qqq;
+    "bar" = <
+        "q" = "e";
+    > %true;
+    "baz" = "qqq";
 }
 
 # Get attribute by path
 $ echo "{foo={bar=<q=e>%true;baz=qqq}}" | ysonq '.foo.bar.Attrs.q'
-e
+"e"
 
 # Print raw literals (won't be converted back to YSON)
 $ echo "[q;w;e;r;t;y]" | ysonq -r '.[]'
@@ -81,13 +79,11 @@ y
 # JSONL (will be represented as YSONL, which is not really a thing but will be parsed back)
 $ echo "[<q=w>e;<r=t>y]" | ysonq '.[]'
 <
-    q=w;
->
-e
+    "q" = "w";
+> "e"
 <
-    r=t;
->
-y
+    "r" = "t";
+> "y"
 
 # Compact form
 $ echo "{foo={bar=<q=e>%true;baz=qqq}}" | ysonq -c '.foo'
@@ -115,16 +111,3 @@ $ seq 1 5 | ysonq -s
     4;
     5;
 ]
-
-# --python-style-output (forced sort by key, forced quoted strings, different intents)
-$ echo "{aaa={ccc=<q=e>%true;bbb=qqq}}" | ysonq -P '.'
-{
-    "aaa" = {
-        "bbb" = "qqq";
-        "ccc" = <
-            "q" = "e";
-        >
-        %true;
-    };
-}
-```
