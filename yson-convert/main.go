@@ -46,7 +46,8 @@ func fromYson(s []byte) (any, error) {
 func toYson(d any, format string) (string, error) {
 	if format == prettyFormat {
 		_, mono := os.LookupEnv("YSON_NO_COLOR")
-		formatter := NewYsonFormatter(4, true, !mono && !testing.Testing() && term.IsTerminal(int(os.Stdout.Fd())))
+		_, color := os.LookupEnv("YSON_FORCE_COLOR")
+		formatter := NewYsonFormatter(4, true, color || !mono && !testing.Testing() && term.IsTerminal(int(os.Stdout.Fd())))
 		return formatter.Dump(d), nil
 	}
 

@@ -22,11 +22,11 @@ while [[ $# -gt 0 ]]; do
 			shift # past argument
 			;;
 		-C|--color-output)
-			YSON_NO_COLOR=1
+			export YSON_FORCE_COLOR=1
 			shift # past argument
 			;;
 		-M|--monochrome-output)
-			# already monochrome by default
+			export YSON_NO_COLOR=1
 			shift # past argument
 			;;
 		-f|--from-file|-L)
@@ -148,4 +148,4 @@ case "$(echo "$JSON" | grep . | wc -l)" in
 		;;
 esac
 
-echo "$JSON" | yson-convert -m j2y $YSON_OUTPUT_ARGS"
+echo "$JSON" | yson-convert -m j2y $YSON_OUTPUT_ARGS
