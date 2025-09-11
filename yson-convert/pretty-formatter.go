@@ -157,7 +157,7 @@ func escapeString(s string) string {
 		case '\t':
 			buf.WriteString("\\t")
 		default:
-			if r < 32 || r > 126 {
+			if r < 32 {
 				buf.WriteString(fmt.Sprintf("\\x%02X", r))
 			} else {
 				buf.WriteRune(r)
