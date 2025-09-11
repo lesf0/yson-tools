@@ -69,7 +69,9 @@ func toYson(d any, format string) (string, error) {
 
 func fromJson(s []byte) (any, error) {
 	var jsonData any
-	err := json.Unmarshal(s, &jsonData)
+	decoder := json.NewDecoder(bytes.NewReader(s))
+	decoder.UseNumber()
+	err := decoder.Decode(&jsonData)
 
 	if err == nil {
 		jsonData = DenormalizeYSON(jsonData)

@@ -1,6 +1,10 @@
 package main
 
-import "go.ytsaurus.tech/yt/go/yson"
+import (
+	"encoding/json"
+
+	"go.ytsaurus.tech/yt/go/yson"
+)
 
 const (
 	valueKey = "Value"
@@ -52,6 +56,16 @@ func DenormalizeYSON(v any) any {
 			v[k] = DenormalizeYSON(x)
 		}
 		return v
+	case json.Number:
+		i, err := v.Int64()
+		if err == nil {
+			return i
+		}
+		f, err := v.Float64()
+		if err != nil {
+			panic("number is neither int nor float")
+		}
+		return f
 	default:
 		return v
 	}
