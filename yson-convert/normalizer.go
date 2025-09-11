@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"go.ytsaurus.tech/yt/go/yson"
 )
@@ -28,6 +29,10 @@ func NormalizeYSON(v any) any {
 			v[k] = NormalizeYSON(x)
 		}
 		return v
+	case float32:
+		return json.Number(strconv.FormatFloat(float64(v), 'e', -1, 32))
+	case float64:
+		return json.Number(strconv.FormatFloat(float64(v), 'e', -1, 64))
 	default:
 		return v
 	}

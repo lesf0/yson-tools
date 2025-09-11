@@ -92,7 +92,7 @@ func toJson(d any, format string) (string, error) {
 	default:
 		panic(fmt.Errorf("unrecognized json format: %v", format))
 	}
-	result, err := marshaler(d)
+	result, err := marshaler(NormalizeYSON(d))
 	if err != nil {
 		return "", err
 	}

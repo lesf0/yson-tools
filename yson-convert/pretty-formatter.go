@@ -128,7 +128,11 @@ func (y *YsonFormatter) writeFloat(f float64) {
 	case f < 0 && (f < -0x7FF0000000000000):
 		y.buffer.WriteString("%-inf")
 	default:
-		y.buffer.WriteString(strconv.FormatFloat(f, 'f', -1, 64))
+		str := strconv.FormatFloat(f, 'f', -1, 64)
+		y.buffer.WriteString(str)
+		if !strings.ContainsRune(str, '.') {
+			y.buffer.WriteRune('.')
+		}
 	}
 }
 
