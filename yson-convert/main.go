@@ -151,7 +151,8 @@ func seek(input []byte, mode string) int {
 		}
 		return end
 	case json2ysonMode:
-		_, err := fromJson(input)
+		var parsed any
+		err := json.Unmarshal(input, &parsed)
 		if err != nil {
 			if serr, ok := err.(*json.SyntaxError); ok {
 				return int(serr.Offset) - 1
