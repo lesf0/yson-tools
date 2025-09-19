@@ -36,3 +36,27 @@ func TestFloat(t *testing.T) {
 		t.Errorf("Result was incorrect, got: %s, want: %s.", actual, expected)
 	}
 }
+
+func TestSeekSingle(t *testing.T) {
+	expected := 4
+	actual := seek([]byte("1234"), "pretty")
+	if expected != actual {
+		t.Errorf("Result was incorrect, got: %d, want: %d.", actual, expected)
+	}
+}
+
+func TestSeekMulti(t *testing.T) {
+	expected := 5
+	actual := seek([]byte("1234 5678"), "pretty")
+	if expected != actual {
+		t.Errorf("Result was incorrect, got: %d, want: %d.", actual, expected)
+	}
+}
+
+func TestSeekObj(t *testing.T) {
+	expected := 2
+	actual := seek([]byte("{}{}"), "pretty")
+	if expected != actual {
+		t.Errorf("Result was incorrect, got: %d, want: %d.", actual, expected)
+	}
+}

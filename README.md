@@ -23,7 +23,7 @@ Formats:
 
 Sequence of YSON (aka YSONL):
 
-`-seq` flag allows to parse a sequence of YSON/JSON values rather than a singular YSON/JSON value. It uses binary search to determine the bounds of separate objects and is not *that* effective, but it works.
+`-seq` flag allows to parse a sequence of YSON/JSON values rather than a singular YSON/JSON value. It uses binary search to determine the bounds of separate YSON objects and is not *that* effective, but it works.
 
 Example: 
 ```bash
@@ -41,7 +41,14 @@ $ echo "{foo={bar=<q=e>%true;baz=qqq}}" | yson-convert -m y2j
 }
 ```
 
-Note: JSON representation produced by y2j mode differs from JSON representation required by j2y mode because reasons. It's neatly hacked around in `ysonq` code, please use `ysonq` if you need back-and-forth conversion.
+### yson-format
+
+A shorthand script to apply pretty formatter to an YSON file
+
+Example:
+```bash
+$ yson-format my-yson-file.yson
+```
 
 ### ysonq
 
