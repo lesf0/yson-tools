@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+    echo "yson-format error: expected single argument" >&2
+    exit 1
+fi
+
+if [ ! -f "$1" ]; then
+    echo "yson-format error: no such file" >&2
+    exit 1
+fi
+
+cat "$1" | yson-convert -m pretty | shuf --output="$1" --random-source=/dev/zero 
