@@ -136,10 +136,9 @@ func seek(input []byte, mode string) int {
 	switch mode {
 	case prettifyMode, yson2jsonMode:
 		start, mid, end := 1, 1, len(input)
-		var err error
 		for start < end {
 			mid = (start + end) >> 1
-			_, err = apply(input[:mid], mode, compactFormat)
+			_, err := apply(input[:mid], mode, compactFormat)
 
 			switch err {
 			case nil:
@@ -150,10 +149,10 @@ func seek(input []byte, mode string) int {
 				end = mid - 1
 			}
 		}
-		if err == nil {
-			return start
+		if _, err := apply(input[:end], mode, compactFormat); err == nil {
+			return end
 		} else {
-			return start - 1
+			return end - 1
 		}
 	case json2ysonMode:
 		var parsed any

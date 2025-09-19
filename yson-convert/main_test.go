@@ -53,6 +53,14 @@ func TestSeekMulti(t *testing.T) {
 	}
 }
 
+func TestSeekMany(t *testing.T) {
+	expected := 2
+	actual := seek([]byte("1 2 3 4"), "pretty")
+	if expected != actual {
+		t.Errorf("Result was incorrect, got: %d, want: %d.", actual, expected)
+	}
+}
+
 func TestSeekObj(t *testing.T) {
 	expected := 2
 	actual := seek([]byte("{}{}"), "pretty")
