@@ -168,8 +168,14 @@ func escapeString(s string) string {
 }
 
 func (y *YsonFormatter) writeList(v interface{}, level int, color string, endColor string) {
-	y.buffer.WriteString(color + "[\n" + endColor)
 	list := reflect.ValueOf(v)
+
+	if list.Len() == 0 {
+		y.buffer.WriteString(color + "[]" + endColor)
+		return
+	}
+
+	y.buffer.WriteString(color + "[\n" + endColor)
 	for i := 0; i < list.Len(); i++ {
 		y.writeIndent(level + 1)
 		y.writeValue(list.Index(i).Interface(), level+1)
