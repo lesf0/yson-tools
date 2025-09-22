@@ -1,6 +1,6 @@
-module github.com/lesf0/yson-tools/yson-convert/pretty-formatter
+module github.com/lesf0/yson-tools/pretty-formatter
 
-go 1.22.0
+go 1.24.0
 
 toolchain go1.24.6
 

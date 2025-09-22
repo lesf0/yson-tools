@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/andrew-d/go-termutil"
-	formatter "github.com/lesf0/yson-tools/yson-convert/pretty-formatter"
+	formatter "github.com/lesf0/yson-tools/pretty-formatter"
 	"go.ytsaurus.tech/yt/go/yson"
 	"golang.org/x/term"
 )
