@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/andrew-d/go-termutil"
+	formatter "github.com/lesf0/yson-tools/yson-convert/pretty-formatter"
 	"go.ytsaurus.tech/yt/go/yson"
 	"golang.org/x/term"
 )
@@ -47,7 +48,7 @@ func toYson(d any, format string) (string, error) {
 	if format == prettyFormat {
 		_, mono := os.LookupEnv("YSON_NO_COLOR")
 		_, color := os.LookupEnv("YSON_FORCE_COLOR")
-		formatter := NewYsonFormatter(4, true, color || !mono && !testing.Testing() && term.IsTerminal(int(os.Stdout.Fd())))
+		formatter := formatter.NewYsonFormatter(4, true, color || !mono && !testing.Testing() && term.IsTerminal(int(os.Stdout.Fd())))
 		return formatter.Dump(d), nil
 	}
 
