@@ -3,7 +3,6 @@ package formatter
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -34,10 +33,10 @@ func parseJQColors(colorsVar string) []string {
 }
 
 // NewYsonFormatter creates an instance of YsonFormatter
-func NewYsonFormatter(indent int, sortKeys bool, colorOutput bool) *YsonFormatter {
-	jqColors, found := os.LookupEnv("JQ_COLORS")
-	if !found {
-		jqColors = "0;90:0;39:0;39:0;39:0;32:1;39:1;39:1;34" // default
+func NewYsonFormatter(indent int, sortKeys bool, colorOutput bool, colorScheme string) *YsonFormatter {
+	var colors []string
+	if colorOutput {
+		colors = parseJQColors(colorScheme)
 	}
 
 	return &YsonFormatter{
@@ -45,7 +44,7 @@ func NewYsonFormatter(indent int, sortKeys bool, colorOutput bool) *YsonFormatte
 		indent:      strings.Repeat(" ", indent),
 		sortKeys:    sortKeys,
 		colorOutput: colorOutput,
-		colors:      parseJQColors(jqColors),
+		colors:      colors,
 	}
 }
 

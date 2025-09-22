@@ -47,8 +47,18 @@ func fromYson(s []byte) (any, error) {
 func toYson(d any, format string) (string, error) {
 	if format == prettyFormat {
 		_, mono := os.LookupEnv("YSON_NO_COLOR")
-		_, color := os.LookupEnv("YSON_FORCE_COLOR")
-		formatter := formatter.NewYsonFormatter(4, true, color || !mono && !testing.Testing() && term.IsTerminal(int(os.Stdout.Fd())))
+		_, forceColor := os.LookupEnv("YSON_FORCE_COLOR")
+		useColors := forceColor || !mono && !testing.Testing() && term.IsTerminal(int(os.Stdout.Fd()))
+
+		colorScheme := ""
+		if useColors {
+			colorScheme, _ = os.LookupEnv("JQ_COLORS")
+			if colorScheme == "" {
+				colorScheme = "0;90:0;39:0;39:0;39:0;32:1;39:1;39:1;34" // default
+			}
+		}
+
+		formatter := formatter.NewYsonFormatter(4, true, useColors, colorScheme)
 		return formatter.Dump(d), nil
 	}
 
