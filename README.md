@@ -118,3 +118,25 @@ $ seq 1 5 | ysonq -s
     4;
     5;
 ]
+```
+
+### ysondiff
+
+A wrapper script for jdiff.
+
+Examples:
+
+```bash
+$ ysondiff <(echo '{foo=<q=w>baz}') <(echo '{foo=<q=e>bar}') -i 4 -s symmetric
+{
+    "foo" = <
+        "q" = [
+            "w";
+            "e";
+        ];
+    > [
+        "baz";
+        "bar";
+    ];
+}
+```
