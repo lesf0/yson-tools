@@ -1,0 +1,61 @@
+#!/bin/bash
+
+JDIFF_ARGS=()
+
+YSON_OUTPUT_ARGS=" -f compact "
+
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-f|--format)
+			echo "ysondiff: cannot use format option (only valid option is YSON)" >&2
+            exit 1
+			;;
+        -i|--indent)
+            if [[ "$2" != "None" ]] ; then
+                if [[ "$2" != "4" ]] ; then
+                    echo "ysondiff: indents other than 4 or None are not supported yet, defaulting to 4" >&2
+                fi
+                YSON_OUTPUT_ARGS+=" -f pretty "
+            else
+                YSON_OUTPUT_ARGS+=" -f compact "
+            fi
+            shift # past argument
+            shift # past value
+            ;;
+        -s|--syntax)
+            JDIFF_ARGS+=("$1") # save arg
+            JDIFF_ARGS+=("$2") # save value
+			shift # past argument
+            shift # past value
+            ;;
+		-*)
+			JDIFF_ARGS+=("$1") # save arg
+			shift # past argument
+			;;
+		*)
+            if [ -z ${FIRST+x} ] ; then
+                FIRST="$1"
+            elif [ -z ${SECOND+x} ] ; then
+                SECOND="$1"
+            else
+                echo "ysondiff: expected exactly 2 positional arguments" >&2
+                exit 1
+            fi
+            shift # past argument
+			;;
+	esac
+done
+
+if [ -z ${SECOND+x} ] ; then
+    echo "ysondiff: expected exactly 2 positional arguments" >&2
+    exit 1
+fi
+
+RESULT="$(
+    jdiff \
+        "${JDIFF_ARGS[@]}" \
+        <( cat "$FIRST" | yson-convert -m y2j -f compact ) \
+        <( cat "$SECOND" | yson-convert -m y2j -f compact )
+)"
+
+echo $RESULT | yson-convert -m j2y $YSON_OUTPUT_ARGS 2>/dev/null || echo $RESULT
