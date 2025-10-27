@@ -97,7 +97,7 @@ if [ ! -z ${HAS_YSONARGS+x} ]; then
 			continue
 		fi
 
-		JQ_ARGS+=("$(yson-convert -m y2j -f compact "$1")")
+		JQ_ARGS+=("$(echo "$1" | yson-convert -m y2j -f compact)")
 		shift
 	done
 fi
