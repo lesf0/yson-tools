@@ -51,8 +51,21 @@ if [ -z ${SECOND+x} ] ; then
     exit 1
 fi
 
+# jdiff is shipped by the jsondiff Python package, but some distros rename the
+# script (Debian/Ubuntu's python3-jsondiff installs it as jsondiff-jdiff)
+if command -v jdiff >/dev/null 2>&1 ; then
+    JDIFF=(jdiff)
+elif command -v jsondiff-jdiff >/dev/null 2>&1 ; then
+    JDIFF=(jsondiff-jdiff)
+elif command -v python3 >/dev/null 2>&1 && python3 -c "import jsondiff.cli" >/dev/null 2>&1 ; then
+    JDIFF=(python3 -m jsondiff.cli)
+else
+    echo "ysondiff: jdiff is required, install the jsondiff python package" >&2
+    exit 1
+fi
+
 RESULT="$(
-    jdiff \
+    "${JDIFF[@]}" \
         "${JDIFF_ARGS[@]}" \
         <( cat "$FIRST" | yson-convert -m y2j -f compact ) \
         <( cat "$SECOND" | yson-convert -m y2j -f compact )

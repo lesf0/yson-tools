@@ -1,3 +1,23 @@
+## Installation
+
+Prebuilt `.deb` and `.rpm` packages (amd64 and arm64) are attached to every
+[release](https://github.com/lesf0/yson-tools/releases):
+
+```bash
+# Debian / Ubuntu
+sudo apt install ./yson-tools_0.3.4-1_amd64.deb
+
+# Fedora / RHEL
+sudo dnf install ./yson-tools-0.3.4-1.x86_64.rpm
+```
+
+The packages are built from `nfpm.yaml` by `.github/workflows/release.yml` and
+use the same layout as the AUR package
+[`yson-tools`](https://aur.archlinux.org/packages/yson-tools): all four commands
+are installed into `/usr/bin`. `jq` is required, and `ysondiff` additionally
+needs `jdiff` (the `jsondiff` Python package: `python-jsondiff` on Arch,
+`python3-jsondiff` on Debian/Ubuntu/Fedora).
+
 ## CLI Tools for Yandex YSON manipulation
 
 ### yson-convert

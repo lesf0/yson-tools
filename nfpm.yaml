@@ -1,0 +1,55 @@
+# Package definition used by the release workflow (.github/workflows/release.yml)
+# to build .deb and .rpm packages with nfpm (https://nfpm.goreleaser.com).
+#
+# Package layout mirrors the AUR package:
+# https://aur.archlinux.org/packages/yson-tools
+#
+# VERSION and ARCH are provided by the workflow:
+#   VERSION=0.3.4 ARCH=amd64 nfpm package --config nfpm.yaml --packager deb
+name: yson-tools
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+version_schema: semver
+release: 1
+section: utils
+priority: optional
+maintainer: Denis Sheremet <aur@lxlz.space>
+vendor: Denis Sheremet
+homepage: https://github.com/lesf0/yson-tools
+license: Apache-2.0
+description: |
+  A set of tools for working with YSON format.
+
+  Includes yson-convert (convert values between YSON and JSON), ysonq
+  (a jq wrapper for YSON), ysondiff (a jdiff wrapper for YSON) and
+  yson-format (pretty-print a YSON file in place).
+depends:
+  - bash
+  - jq
+# ysondiff needs jdiff, shipped by the jsondiff Python package. It is named
+# python3-jsondiff on Debian/Ubuntu and Fedora, but is not available everywhere,
+# so it is a weak dependency and only ysonq/yson-format work without it.
+recommends:
+  - python3-jsondiff
+contents:
+  - src: build/yson-convert
+    dst: /usr/bin/yson-convert
+    file_info:
+      mode: 0755
+  - src: ysonq
+    dst: /usr/bin/ysonq
+    file_info:
+      mode: 0755
+  - src: yson-format
+    dst: /usr/bin/yson-format
+    file_info:
+      mode: 0755
+  - src: ysondiff
+    dst: /usr/bin/ysondiff
+    file_info:
+      mode: 0755
+
+# Fixed so that local builds and CI builds only differ in what they should.
+rpm:
+  buildhost: github-actions

@@ -1,0 +1,141 @@
+name: Release packages
+
+# Builds .deb and .rpm packages whenever a GitHub release is published and
+# attaches them to that release. The package layout mirrors the AUR package
+# (https://aur.archlinux.org/packages/yson-tools), see nfpm.yaml.
+#
+# A manual run (workflow_dispatch) only uploads the packages as workflow
+# artifacts, so the pipeline can be exercised without cutting a release.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build packages from (dry run, nothing is published)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  NFPM_VERSION: v2.47.0
+
+jobs:
+  build:
+    name: Package (${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - name: Resolve version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            tag="$RELEASE_TAG"
+          else
+            tag="$INPUT_TAG"
+          fi
+          if [[ -z "$tag" ]]; then
+            echo "no tag to package" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          # deb requires versions to start with a digit, so drop the leading 'v'
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "Packaging $tag as ${tag#v} for ${{ matrix.goarch }}"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.version.outputs.tag }}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: yson-convert/go.mod
+          cache-dependency-path: yson-convert/go.sum
+
+      - name: Build yson-convert
+        working-directory: yson-convert
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -trimpath -ldflags="-s -w" -o "$GITHUB_WORKSPACE/build/yson-convert" .
+
+      - name: Install nfpm
+        run: |
+          set -euo pipefail
+          curl -sSfL "https://github.com/goreleaser/nfpm/releases/download/${NFPM_VERSION}/nfpm_${NFPM_VERSION#v}_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin nfpm
+          nfpm --version
+
+      - name: Build packages
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          case "$ARCH" in
+            amd64) deb_arch=amd64; rpm_arch=x86_64 ;;
+            arm64) deb_arch=arm64; rpm_arch=aarch64 ;;
+            *) echo "unsupported architecture: $ARCH" >&2; exit 1 ;;
+          esac
+          mkdir -p dist
+          # reproducible timestamps inside the packages
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          nfpm package --config nfpm.yaml --packager deb \
+            --target "dist/yson-tools_${VERSION}-1_${deb_arch}.deb"
+          nfpm package --config nfpm.yaml --packager rpm \
+            --target "dist/yson-tools-${VERSION}-1.${rpm_arch}.rpm"
+          ls -l dist
+
+      - name: Verify package contents
+        run: |
+          set -euo pipefail
+          for deb in dist/*.deb; do
+            echo "== $deb"
+            listing="$(dpkg-deb -c "$deb")"
+            echo "$listing"
+            for f in usr/bin/yson-convert usr/bin/ysonq usr/bin/yson-format usr/bin/ysondiff; do
+              grep -qE " \./$f\$" <<<"$listing" \
+                || { echo "$f is missing from $deb" >&2; exit 1; }
+            done
+            dpkg-deb -f "$deb" Package Version Architecture Depends Recommends
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages-${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Attach packages to release
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Show packages
+        run: ls -l dist
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: dist/*
+          fail_on_unmatched_files: true
