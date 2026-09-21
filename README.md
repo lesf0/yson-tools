@@ -105,15 +105,15 @@ Example:
 ```bash
 $ echo "{foo={bar=<q=e>%true;baz=qqq}}" | yson-convert -m y2j
 {
-    "foo": {
-        "bar": {
-            "Attrs": {
-                "q": "e"
-            },
-            "Value": true
-        },
-        "baz": "qqq"
-    }
+	"foo": {
+		"bar": {
+			"Attrs": {
+				"q": "e"
+			},
+			"Value": true
+		},
+		"baz": "qqq"
+	}
 }
 ```
 
@@ -123,7 +123,17 @@ A shorthand script to apply pretty formatter to an YSON file
 
 Example:
 ```bash
+$ echo '{foo={bar=<q=e>%true;baz=qqq}}' > my-yson-file.yson
 $ yson-format my-yson-file.yson
+$ cat my-yson-file.yson
+{
+    "foo" = {
+        "bar" = <
+            "q" = "e";
+        > %true;
+        "baz" = "qqq";
+    };
+}
 ```
 
 ### ysonq
@@ -216,6 +226,21 @@ $ ysondiff <(echo '{foo=<q=w>baz}') <(echo '{foo=<q=e>bar}') -i 4 -s symmetric
     ];
 }
 ```
+
+## Testing
+
+`.github/workflows/test.yml` runs the Go tests and every example in the Usage
+section of this file. The examples are checked by `scripts/readme-examples.py`,
+which extracts the `$ command` lines and compares the output with what this
+README claims, so changing what a tool prints means updating this file:
+
+```bash
+(cd yson-convert && go build -o ../build/yson-convert .)
+./scripts/readme-examples.py
+```
+
+It needs `jq` and `jsondiff` (which ships `jdiff`), the same requirements as
+`ysondiff` itself, and looks for the tools in `./build` and next to this file.
 
 ## Releasing
 

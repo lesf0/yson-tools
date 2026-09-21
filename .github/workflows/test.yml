@@ -1,0 +1,47 @@
+name: Test
+
+# Runs the Go tests and the examples in README.md against freshly built tools.
+# The examples are the documentation and, apart from yson-convert's own tests,
+# the closest thing this repository has to a test suite.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests and README examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: yson-convert/go.mod
+          cache-dependency-path: yson-convert/go.sum
+
+      - name: Go tests
+        working-directory: yson-convert
+        run: go test ./...
+
+      - name: Build yson-convert
+        working-directory: yson-convert
+        env:
+          CGO_ENABLED: "0"
+        run: go build -trimpath -ldflags="-s -w" -o "$GITHUB_WORKSPACE/build/yson-convert" .
+
+      # ysondiff shells out to jdiff, which the jsondiff python package ships
+      - name: Install jq and jsondiff
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends jq python3-venv
+          python3 -m venv "$RUNNER_TEMP/jsondiff"
+          "$RUNNER_TEMP/jsondiff/bin/pip" install --quiet jsondiff pyyaml
+          echo "$RUNNER_TEMP/jsondiff/bin" >> "$GITHUB_PATH"
+
+      - name: README examples
+        run: ./scripts/readme-examples.py
