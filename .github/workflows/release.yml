@@ -138,6 +138,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      # the template is rendered from the tree being released, so it has to be
+      # checked out here too: this job only receives artifacts otherwise
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
       - uses: actions/download-artifact@v8
         with:
           path: dist
