@@ -76,7 +76,7 @@ package depends on both, and the Homebrew formula bundles its own copy of
 and `python3 -m jsondiff.cli` where that name is packaged differently, and tells
 you what to install if it finds none.
 
-## CLI Tools for Yandex YSON manipulation
+## Usage
 
 ### yson-convert
 
