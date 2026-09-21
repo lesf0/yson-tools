@@ -84,6 +84,24 @@ A tool to convert values between YSON and JSON.
 
 Usage: `yson-convert [-m mode] [-f format] [-seq] value` or `echo value | yson-convert [-m mode] [-f format] [-seq]`
 
+The value comes from the argument, from stdin (a pipe, a redirect or a
+here-document), or from `-i FILE`; the result goes to stdout or to `-o FILE`,
+with `-` meaning stdin and stdout. `-o` opens the file only after the input has
+been read and converted, so a file can be formatted in place, keeping its inode
+and its permissions:
+
+```bash
+$ echo '{foo=bar}' > f.yson
+$ yson-convert -m pretty -i f.yson -o f.yson
+$ cat f.yson
+{
+    "foo" = "bar";
+}
+```
+
+Flags go before the value: `yson-convert {a=1} -o out.yson` fails, since
+everything after the value is read as another argument.
+
 Modes:
 
 - y2j: convert YSON to JSON
@@ -99,7 +117,7 @@ Formats:
 
 Sequence of YSON (aka YSONL):
 
-`-seq` flag allows to parse a sequence of YSON/JSON values rather than a singular YSON/JSON value. It uses binary search to determine the bounds of separate YSON objects and is not *that* effective, but it works.
+`-seq` flag allows to parse a sequence of YSON/JSON values rather than a singular YSON/JSON value. It uses binary search to determine the bounds of separate YSON objects and is not *that* effective, but it works. It needs an explicit mode: in `guess` mode a truncated value cannot be told apart from an invalid one.
 
 Example: 
 ```bash
@@ -119,7 +137,9 @@ $ echo "{foo={bar=<q=e>%true;baz=qqq}}" | yson-convert -m y2j
 
 ### yson-format
 
-A shorthand script to apply pretty formatter to an YSON file
+A shorthand script to apply pretty formatter to an YSON file: it is
+`yson-convert -m pretty -i FILE -o FILE`, so the file is formatted in place and
+keeps its permissions.
 
 Example:
 ```bash

@@ -12,7 +12,6 @@ require (
 require golang.org/x/sys v0.36.0 // indirect
 
 require (
-	github.com/andrew-d/go-termutil v0.0.0-20150726205930-009166a695a2
 	go.ytsaurus.tech/library/go/core/xerrors v0.0.4 // indirect
 	go.ytsaurus.tech/library/go/x/xreflect v0.0.3 // indirect
 	go.ytsaurus.tech/library/go/x/xruntime v0.0.4 // indirect

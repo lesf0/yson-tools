@@ -8,9 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
-	"testing"
 
-	"github.com/andrew-d/go-termutil"
 	formatter "github.com/lesf0/yson-tools/pretty-formatter"
 	"go.ytsaurus.tech/yt/go/yson"
 	"golang.org/x/term"
@@ -28,6 +26,10 @@ const compactFormat = "compact"
 const binaryFormat = "binary"
 
 const defaultFormat = prettyFormat
+
+// autoColor is set in main: the pretty printer colours its output only when
+// that output goes to a terminal, never when it goes into a file.
+var autoColor bool
 
 func fromYson(s []byte) (any, error) {
 	var ysonData any
@@ -48,7 +50,7 @@ func toYson(d any, format string) (string, error) {
 	if format == prettyFormat {
 		_, mono := os.LookupEnv("YSON_NO_COLOR")
 		_, forceColor := os.LookupEnv("YSON_FORCE_COLOR")
-		useColors := forceColor || !mono && !testing.Testing() && term.IsTerminal(int(os.Stdout.Fd()))
+		useColors := forceColor || !mono && autoColor
 
 		colorScheme := ""
 		if useColors {
@@ -69,7 +71,7 @@ func toYson(d any, format string) (string, error) {
 	case binaryFormat:
 		ysonFormat = yson.FormatBinary
 	default:
-		panic(fmt.Errorf("unexpected yson format: %v", format))
+		return "", fmt.Errorf("unexpected yson format: %v", format)
 	}
 	result, err := yson.MarshalFormat(d, ysonFormat)
 	if err != nil {
@@ -101,7 +103,7 @@ func toJson(d any, format string) (string, error) {
 	case compactFormat:
 		marshaler = json.Marshal
 	default:
-		panic(fmt.Errorf("unrecognized json format: %v", format))
+		return "", fmt.Errorf("json output cannot be written in %s format", format)
 	}
 	result, err := marshaler(NormalizeYSON(d))
 	if err != nil {
@@ -139,11 +141,11 @@ func apply(input []byte, mode string, format string) (string, error) {
 	case yson2jsonMode:
 		return chain(input, fromYson, applyFormat(toJson, format))
 	default:
-		panic(fmt.Errorf("unknown mode: %v", mode))
+		return "", fmt.Errorf("unknown mode: %v", mode)
 	}
 }
 
-func seek(input []byte, mode string) int {
+func seek(input []byte, mode string) (int, error) {
 	switch mode {
 	case prettifyMode, yson2jsonMode:
 		start, mid, end := 1, 1, len(input)
@@ -161,61 +163,147 @@ func seek(input []byte, mode string) int {
 			}
 		}
 		if _, err := apply(input[:end], mode, compactFormat); err == nil {
-			return end
-		} else {
-			return end - 1
+			return end, nil
 		}
+		return end - 1, nil
 	case json2ysonMode:
 		var parsed any
 		err := json.Unmarshal(input, &parsed)
 		if err != nil {
 			if serr, ok := err.(*json.SyntaxError); ok {
-				return int(serr.Offset) - 1
+				return int(serr.Offset) - 1, nil
 			}
 		}
-		return len(input)
+		return len(input), nil
 
 	default:
-		panic(fmt.Errorf("seek is not implemented for %s mode", mode))
+		return 0, fmt.Errorf("seek is not implemented for %s mode", mode)
 	}
 }
 
 func handle(input []byte, mode string, format string, readAsSeq bool) (string, error) {
 	if !readAsSeq {
 		return apply(input, mode, format)
-	} else {
-		// if it's stupid but it works it's not stupid
-		var results []string
-		ok := false
-		var lastErr error
-
-		for len(input) != 0 {
-			var result string
-
-			end := seek(input, mode)
-
-			result, err := apply(input[:end], mode, format)
-			input = input[end:]
-
-			if err == nil {
-				results = append(results, result)
-				ok = true
-			} else {
-				if len(bytes.TrimSpace(input)) > 0 {
-					return "", fmt.Errorf("illegal characters at the end of input")
-				}
-
-				lastErr = err
-				break
-			}
-		}
-
-		if !ok {
-			return "", fmt.Errorf("unable to parse input: %v", lastErr)
-		}
-
-		return strings.Join(results, "\n"), nil
 	}
+
+	// if it's stupid but it works it's not stupid
+	var results []string
+	ok := false
+	var lastErr error
+
+	for len(input) != 0 {
+		end, err := seek(input, mode)
+		if err != nil {
+			return "", err
+		}
+
+		result, err := apply(input[:end], mode, format)
+		input = input[end:]
+
+		if err == nil {
+			results = append(results, result)
+			ok = true
+		} else {
+			if len(bytes.TrimSpace(input)) > 0 {
+				return "", fmt.Errorf("illegal characters at the end of input")
+			}
+
+			lastErr = err
+			break
+		}
+	}
+
+	if !ok {
+		return "", fmt.Errorf("unable to parse input: %v", lastErr)
+	}
+
+	return strings.Join(results, "\n"), nil
+}
+
+// checkMode rejects a mode or format the tool cannot produce, rather than
+// failing half way through the conversion with an empty result.
+func checkMode(mode string, format string, readAsSeq bool) error {
+	switch mode {
+	case guessMode, prettifyMode, json2ysonMode, yson2jsonMode:
+	default:
+		return fmt.Errorf("unknown mode: %v", mode)
+	}
+
+	switch format {
+	case prettyFormat, compactFormat, binaryFormat:
+	default:
+		return fmt.Errorf("unknown format: %v", format)
+	}
+
+	// splitting a sequence in guess mode cannot work: past the end of a value
+	// both guesses fail, so a truncated prefix is indistinguishable from an
+	// invalid one and the search would cut the input in the wrong place
+	if readAsSeq && mode == guessMode {
+		return fmt.Errorf("-seq needs an explicit mode, pass -m y2j, -m j2y or -m pretty")
+	}
+
+	return nil
+}
+
+// readInput returns the value to convert: the single positional argument as
+// data, the -i file, or stdin when it is not a terminal.
+func readInput(path string, args []string) ([]byte, error) {
+	if len(args) > 1 {
+		return nil, fmt.Errorf("expected at most one positional argument with data, got %d (flags go before it)", len(args))
+	}
+
+	if len(args) == 1 {
+		if path != "" {
+			return nil, fmt.Errorf("give either a value argument or -i, not both")
+		}
+		return []byte(args[0]), nil
+	}
+
+	if path != "" && path != "-" {
+		return os.ReadFile(path)
+	}
+
+	// "-" asks for stdin explicitly, an unset -i only takes it when something
+	// is actually there: without a terminal to type into, an interactive run
+	// would otherwise hang waiting for input that never comes
+	if path == "" && term.IsTerminal(int(os.Stdin.Fd())) {
+		return nil, fmt.Errorf("expected a value argument or data on stdin")
+	}
+
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return nil, fmt.Errorf("reading stdin: %w", err)
+	}
+	return data, nil
+}
+
+// writeOutput writes the converted value. The file is opened here, after the
+// input has been read and converted, which is what makes "-i f -o f" safe.
+func writeOutput(path string, result string) error {
+	if path == "" || path == "-" {
+		fmt.Println(result)
+		return nil
+	}
+
+	// truncating an existing file keeps its inode and its permissions, so this
+	// is an edit in place rather than a replacement
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintln(file, result); err != nil {
+		file.Close()
+		return err
+	}
+	return file.Close()
+}
+
+// fail reports a fatal error the way a command line tool should: one line on
+// stderr and a non-zero exit, no stack trace.
+func fail(err error) {
+	fmt.Fprintf(os.Stderr, "yson-convert: %v\n", err)
+	os.Exit(1)
 }
 
 func main() {
@@ -229,41 +317,35 @@ func main() {
 
 	readAsSeq := flag.Bool("seq", false, "attempt to read the input as a sequence of (Y/J)SON's")
 
+	var input string
+	flag.StringVar(&input, "input", "", "read the value from a file, \"-\" for stdin")
+	flag.StringVar(&input, "i", "", "read the value from a file (shorthand)")
+
+	var output string
+	flag.StringVar(&output, "output", "", "write the result to a file, \"-\" for stdout")
+	flag.StringVar(&output, "o", "", "write the result to a file (shorthand)")
+
 	flag.Parse()
 
-	var input []byte
-
-	if termutil.Isatty(os.Stdin.Fd()) {
-		if flag.NArg() != 1 {
-			panic(fmt.Errorf("expected single arg with data"))
-		}
-		input = []byte(flag.Arg(0))
-	} else {
-		fi, err := os.Stdin.Stat()
-		if err != nil {
-			panic(err)
-		}
-		if fi.Mode()&os.ModeNamedPipe == 0 {
-			// stdin is empty, try reading args
-			if flag.NArg() != 1 {
-				panic(fmt.Errorf("expected either non-empty pipe or single arg with data"))
-			}
-			input = []byte(flag.Arg(0))
-		} else {
-			if flag.NArg() != 0 {
-				panic(fmt.Errorf("expected no positional args"))
-			}
-
-			input, err = io.ReadAll(os.Stdin)
-			if err != nil {
-				panic(fmt.Errorf("error reading from stdin: %v", err))
-			}
-		}
+	if err := checkMode(mode, format, *readAsSeq); err != nil {
+		fail(err)
 	}
 
-	result, err := handle(input, mode, format, *readAsSeq)
+	// colours are decided before the output is opened: a file, a pipe or a
+	// redirection must never receive escape sequences
+	autoColor = (output == "" || output == "-") && term.IsTerminal(int(os.Stdout.Fd()))
+
+	data, err := readInput(input, flag.Args())
 	if err != nil {
-		panic(fmt.Errorf("conversion resulted in error: %v", err))
+		fail(err)
 	}
-	fmt.Println(result)
+
+	result, err := handle(data, mode, format, *readAsSeq)
+	if err != nil {
+		fail(fmt.Errorf("conversion resulted in error: %v", err))
+	}
+
+	if err := writeOutput(output, result); err != nil {
+		fail(err)
+	}
 }
