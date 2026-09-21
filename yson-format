@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 if [ $# -ne 1 ]; then
     echo "yson-format error: expected single argument" >&2
     exit 1
@@ -10,4 +12,25 @@ if [ ! -f "$1" ]; then
     exit 1
 fi
 
-cat "$1" | yson-convert -m pretty | shuf --output="$1" --random-source=/dev/zero 
+if [ ! -w "$1" ]; then
+    echo "yson-format error: no write permission on '$1'" >&2
+    exit 1
+fi
+
+# Format through a temporary file in the same directory as the input, so the
+# final rename is atomic and the input is left untouched if the conversion
+# fails. mktemp creates the file as 0600, so copy the original permissions over
+# once it is written: stat's mode flag differs between GNU and BSD/macOS.
+TMP="$(mktemp "$1.yson-format.XXXXXX")"
+trap 'rm -f -- "$TMP"' EXIT
+
+# yson-convert only reads stdin when it is a pipe, so cat into it rather than
+# redirecting the file
+cat "$1" | yson-convert -m pretty > "$TMP"
+
+mode="$(stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1" 2>/dev/null || true)"
+if [ -n "$mode" ]; then
+    chmod "$mode" "$TMP"
+fi
+
+mv -- "$TMP" "$1"

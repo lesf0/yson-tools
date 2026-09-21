@@ -1,18 +1,24 @@
 name: Release packages
 
-# Builds .deb and .rpm packages whenever a GitHub release is published and
-# attaches them to that release. The package layout mirrors the AUR package
-# (https://aur.archlinux.org/packages/yson-tools), see nfpm.yaml.
+# Builds the release artifacts whenever a GitHub release is published and
+# publishes them to every distribution channel:
 #
-# A manual run (workflow_dispatch) only uploads the packages as workflow
-# artifacts, so the pipeline can be exercised without cutting a release.
+#   * .deb/.rpm packages and tarballs -> attached to the release
+#   * Formula/yson-tools.rb            -> pushed to the homebrew tap
+#   * PKGBUILD                         -> bumped and pushed to the AUR
+#
+# All three share one definition of the package contents, see nfpm.yaml,
+# packaging/homebrew/yson-tools.rb.tmpl and packaging/aur/PKGBUILD.
+#
+# A manual run (workflow_dispatch) builds everything but publishes nothing: the
+# artifacts stay attached to the workflow run.
 on:
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to build packages from (dry run, nothing is published)
+        description: Existing tag to build from (dry run, nothing is published)
         required: true
         type: string
 
@@ -20,42 +26,36 @@ permissions:
   contents: read
 
 env:
+  # tag being released, the leading "v" is stripped where a version is needed
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
   NFPM_VERSION: v2.47.0
+  # repository that receives Formula/yson-tools.rb
+  HOMEBREW_TAP: lesf0/homebrew-tap
+  # AUR host key, as published on https://aur.archlinux.org/
+  AUR_HOST_KEY_FINGERPRINT: "SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4"
 
 jobs:
   build:
-    name: Package (${{ matrix.goarch }})
+    name: Package (${{ matrix.goos }}/${{ matrix.goarch }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        goos: [linux, darwin]
         goarch: [amd64, arm64]
     steps:
-      - name: Resolve version
-        id: version
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          INPUT_TAG: ${{ inputs.tag }}
+      - name: Check the tag
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == "release" ]]; then
-            tag="$RELEASE_TAG"
-          else
-            tag="$INPUT_TAG"
-          fi
-          if [[ -z "$tag" ]]; then
-            echo "no tag to package" >&2
+          if [[ -z "$TAG" ]]; then
+            echo "::error::no tag to build: pass one when dispatching this workflow"
             exit 1
           fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          # deb requires versions to start with a digit, so drop the leading 'v'
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-          echo "Packaging $tag as ${tag#v} for ${{ matrix.goarch }}"
+          echo "packaging $TAG for ${{ matrix.goos }}/${{ matrix.goarch }}"
 
       - uses: actions/checkout@v7
         with:
-          ref: ${{ steps.version.outputs.tag }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - uses: actions/setup-go@v7
         with:
@@ -66,11 +66,22 @@ jobs:
         working-directory: yson-convert
         env:
           CGO_ENABLED: "0"
-          GOOS: linux
+          GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: go build -trimpath -ldflags="-s -w" -o "$GITHUB_WORKSPACE/build/yson-convert" .
 
+      - name: Build tarball
+        run: |
+          set -euo pipefail
+          name="yson-tools-${TAG#v}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          mkdir -p "stage/${name}" dist
+          install -m755 build/yson-convert "stage/${name}/yson-convert"
+          install -m755 ysonq yson-format ysondiff "stage/${name}/"
+          tar -czf "dist/${name}.tar.gz" -C stage "${name}"
+          sha256sum "dist/${name}.tar.gz"
+
       - name: Install nfpm
+        if: matrix.goos == 'linux'
         run: |
           set -euo pipefail
           curl -sSfL "https://github.com/goreleaser/nfpm/releases/download/${NFPM_VERSION}/nfpm_${NFPM_VERSION#v}_Linux_x86_64.tar.gz" \
@@ -78,17 +89,18 @@ jobs:
           nfpm --version
 
       - name: Build packages
+        if: matrix.goos == 'linux'
         env:
-          VERSION: ${{ steps.version.outputs.version }}
           ARCH: ${{ matrix.goarch }}
         run: |
           set -euo pipefail
+          # nfpm.yaml expands ${VERSION} and ${ARCH} from the environment
+          export VERSION="${TAG#v}"
           case "$ARCH" in
             amd64) deb_arch=amd64; rpm_arch=x86_64 ;;
             arm64) deb_arch=arm64; rpm_arch=aarch64 ;;
             *) echo "unsupported architecture: $ARCH" >&2; exit 1 ;;
           esac
-          mkdir -p dist
           # reproducible timestamps inside the packages
           export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
           nfpm package --config nfpm.yaml --packager deb \
@@ -98,6 +110,7 @@ jobs:
           ls -l dist
 
       - name: Verify package contents
+        if: matrix.goos == 'linux'
         run: |
           set -euo pipefail
           for deb in dist/*.deb; do
@@ -113,15 +126,14 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: packages-${{ matrix.goarch }}
+          name: packages-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/*
           if-no-files-found: error
           retention-days: 7
 
   publish:
-    name: Attach packages to release
+    name: Publish release assets
     needs: build
-    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -131,11 +143,187 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Show packages
-        run: ls -l dist
+      - name: Render homebrew formula
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          # checked up front: a sha256 computed from a missing file would come out
+          # empty and silently produce a formula that cannot be installed
+          for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            tarball="dist/yson-tools-${version}-${platform}.tar.gz"
+            if [[ ! -f "$tarball" ]]; then
+              echo "::error::$tarball was not built, cannot render the formula"
+              exit 1
+            fi
+          done
+          # assignments, unlike substitutions passed as sed arguments, do fail the step
+          sha_linux_amd64="$(sha256sum "dist/yson-tools-${version}-linux-amd64.tar.gz" | cut -d' ' -f1)"
+          sha_linux_arm64="$(sha256sum "dist/yson-tools-${version}-linux-arm64.tar.gz" | cut -d' ' -f1)"
+          sha_darwin_amd64="$(sha256sum "dist/yson-tools-${version}-darwin-amd64.tar.gz" | cut -d' ' -f1)"
+          sha_darwin_arm64="$(sha256sum "dist/yson-tools-${version}-darwin-arm64.tar.gz" | cut -d' ' -f1)"
+          sed -e "s/__VERSION__/${version}/g" \
+              -e "s/__SHA_LINUX_AMD64__/${sha_linux_amd64}/g" \
+              -e "s/__SHA_LINUX_ARM64__/${sha_linux_arm64}/g" \
+              -e "s/__SHA_DARWIN_AMD64__/${sha_darwin_amd64}/g" \
+              -e "s/__SHA_DARWIN_ARM64__/${sha_darwin_arm64}/g" \
+              packaging/homebrew/yson-tools.rb.tmpl > dist/yson-tools.rb
+          if grep -q '__[A-Z_]*__' dist/yson-tools.rb; then
+            echo "::error::formula still has unsubstituted placeholders:"
+            grep -n '__[A-Z_]*__' dist/yson-tools.rb
+            exit 1
+          fi
+          if grep -q 'sha256 ""' dist/yson-tools.rb; then
+            echo "::error::formula has an empty checksum"
+            exit 1
+          fi
+          cat dist/yson-tools.rb
 
-      - uses: softprops/action-gh-release@v3
+      - name: Formula summary
+        run: |
+          {
+            echo "### Homebrew formula for ${TAG#v}"
+            echo '```ruby'
+            cat dist/yson-tools.rb
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: homebrew-formula
+          path: dist/yson-tools.rb
+          retention-days: 7
+
+      - name: Attach assets to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: dist/*
+          files: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.tar.gz
           fail_on_unmatched_files: true
+
+  tap:
+    name: Push formula to homebrew tap
+    needs: publish
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: homebrew-formula
+          path: formula
+
+      - name: Push formula
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$TAP_TOKEN" ]]; then
+            echo "::error::HOMEBREW_TAP_TOKEN is not set, see the Releasing section of README.md"
+            exit 1
+          fi
+          echo "::add-mask::$TAP_TOKEN"
+          # the token is passed as a header rather than in the remote URL so it
+          # cannot leak through git error messages
+          auth="$(printf 'x-access-token:%s' "$TAP_TOKEN" | base64 -w0)"
+          remote="https://github.com/${HOMEBREW_TAP}.git"
+          if ! git -c http.extraheader="Authorization: Basic ${auth}" ls-remote --exit-code "$remote" >/dev/null 2>&1; then
+            echo "::error::cannot read ${HOMEBREW_TAP}: create the tap repository and give HOMEBREW_TAP_TOKEN write access to it"
+            exit 1
+          fi
+          git -c http.extraheader="Authorization: Basic ${auth}" clone --depth 1 "$remote" tap
+          install -Dm644 formula/yson-tools.rb tap/Formula/yson-tools.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/yson-tools.rb
+          if git diff --cached --quiet; then
+            echo "formula is already up to date"
+          else
+            git commit -m "yson-tools ${TAG#v}"
+            git -c http.extraheader="Authorization: Basic ${auth}" push origin HEAD
+          fi
+
+  aur:
+    name: Bump AUR package
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    env:
+      SRC: /tmp/src
+    steps:
+      - name: Install dependencies
+        run: pacman -Sy --noconfirm --needed git openssh
+
+      - name: Check out PKGBUILD source
+        run: git clone --depth 1 --branch "$TAG" "https://github.com/${GITHUB_REPOSITORY}.git" "$SRC"
+
+      - name: Bump pkgver
+        run: |
+          set -euo pipefail
+          pkgbuild="$SRC/packaging/aur/PKGBUILD"
+          sed -i -e "s/^pkgver=.*/pkgver=${TAG#v}/" -e "s/^pkgrel=.*/pkgrel=1/" "$pkgbuild"
+          grep -qx "pkgver=${TAG#v}" "$pkgbuild" \
+            || { echo "::error::could not set pkgver in $pkgbuild"; exit 1; }
+          echo "bumping the AUR package to ${TAG#v}"
+
+      - name: Prepare builder user
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$AUR_SSH_PRIVATE_KEY" ]]; then
+            echo "::error::AUR_SSH_PRIVATE_KEY is not set, see the Releasing section of README.md"
+            exit 1
+          fi
+          echo "::add-mask::$AUR_SSH_PRIVATE_KEY"
+          # makepkg refuses to run as root, so the AUR is updated by a normal user
+          useradd --create-home --shell /bin/bash builder
+          install -d -m700 -o builder -g builder /home/builder/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > /home/builder/.ssh/aur
+          chmod 600 /home/builder/.ssh/aur
+          keyscan="$(ssh-keyscan -t ed25519 aur.archlinux.org 2>/dev/null)"
+          fingerprint="$(printf '%s\n' "$keyscan" | ssh-keygen -lf - | awk '{print $2}')"
+          if [[ "$fingerprint" != "$AUR_HOST_KEY_FINGERPRINT" ]]; then
+            echo "::error::aur.archlinux.org host key is '$fingerprint', expected '$AUR_HOST_KEY_FINGERPRINT'"
+            exit 1
+          fi
+          printf '%s\n' "$keyscan" > /home/builder/.ssh/known_hosts
+          chown -R builder /home/builder/.ssh "$SRC"
+
+      - name: Push to AUR
+        run: |
+          set -euo pipefail
+          cat > /tmp/deploy-aur.sh <<'SCRIPT'
+          #!/bin/bash
+          set -euo pipefail
+          : "${SRC:=/tmp/src}"
+          : "${AUR_REPO:=ssh://aur@aur.archlinux.org/yson-tools.git}"
+          version="$(sed -n 's/^pkgver=//p' "$SRC/packaging/aur/PKGBUILD")"
+          : "${version:?could not read pkgver from the PKGBUILD}"
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          git clone "$AUR_REPO" "$HOME/aur"
+          cp "$SRC/packaging/aur/PKGBUILD" "$HOME/aur/PKGBUILD"
+          cd "$HOME/aur"
+          makepkg --printsrcinfo > .SRCINFO
+          git config user.name "Denis Sheremet"
+          git config user.email "aur@lxlz.space"
+          git add PKGBUILD .SRCINFO
+          if git diff --cached --quiet; then
+            echo "the AUR package is already at $version"
+          else
+            git commit -m "bump to $version"
+            git push origin HEAD
+            echo "pushed $version to the AUR"
+          fi
+          SCRIPT
+          chmod 755 /tmp/deploy-aur.sh
+          export SRC
+          su builder -s /bin/bash /tmp/deploy-aur.sh
