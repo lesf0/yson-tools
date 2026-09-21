@@ -1,7 +1,13 @@
+# yson-tools
+
+Command-line tools for the Yandex YSON format. `yson-convert` converts values
+between YSON and JSON, `ysonq` runs `jq` over YSON, `ysondiff` diffs two YSON
+documents and `yson-format` pretty-prints a YSON file in place.
+
 ## Installation
 
-All four commands (`yson-convert`, `ysonq`, `yson-format`, `ysondiff`) are
-installed together by every method below.
+All four commands are installed together by every method below, except
+`go install`, which builds only the converter.
 
 ### Homebrew
 
@@ -36,10 +42,18 @@ Prebuilt `.deb` and `.rpm` packages (amd64 and arm64) are attached to every
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./yson-tools_0.3.4-1_amd64.deb
+sudo apt install ./yson-tools_0.3.6-1_amd64.deb
 
 # Fedora / RHEL
-sudo dnf install ./yson-tools-0.3.4-1.x86_64.rpm
+sudo dnf install ./yson-tools-0.3.6-1.x86_64.rpm
+```
+
+### Go
+
+Just the converter, as a Go binary:
+
+```bash
+go install github.com/lesf0/yson-tools/yson-convert@latest
 ```
 
 ### Tarballs
@@ -49,11 +63,9 @@ linux/darwin on amd64/arm64; these are what the Homebrew formula installs, and
 they work anywhere with a `bash` and a `jq`:
 
 ```bash
-tar -xzf yson-tools-0.3.4-linux-amd64.tar.gz
-install -m755 yson-tools-0.3.4-linux-amd64/* ~/.local/bin/
+tar -xzf yson-tools-0.3.6-linux-amd64.tar.gz
+install -m755 yson-tools-0.3.6-linux-amd64/* ~/.local/bin/
 ```
-
-Just the converter, as a Go binary: `go install github.com/lesf0/yson-tools/yson-convert@latest`.
 
 ### Requirements
 
@@ -64,46 +76,11 @@ package depends on both, and the Homebrew formula bundles its own copy of
 and `python3 -m jsondiff.cli` where that name is packaged differently, and tells
 you what to install if it finds none.
 
-## Releasing
-
-Publishing a GitHub release (`git tag v0.3.5 && git push origin v0.3.5`, then a
-release from that tag) runs `.github/workflows/release.yml`, which:
-
-1. builds `yson-convert` for linux/darwin on amd64/arm64 with `CGO_ENABLED=0`
-   and packs it with the three shell scripts into
-   `yson-tools-<version>-<os>-<arch>.tar.gz`,
-2. builds `.deb` and `.rpm` packages from `nfpm.yaml` for amd64 and arm64, and
-   attaches them and the tarballs to the release,
-3. renders `packaging/homebrew/yson-tools.rb.tmpl` with the new version and the
-   four tarball checksums, and pushes the result to `lesf0/homebrew-tap` as
-   `Formula/yson-tools.rb`,
-4. bumps `pkgver` in `packaging/aur/PKGBUILD`, regenerates `.SRCINFO` and pushes
-   both to [the AUR package](https://aur.archlinux.org/packages/yson-tools).
-
-Only *published* releases trigger this (a draft builds nothing). To rehearse the
-whole thing without publishing, run the workflow manually
-(`workflow_dispatch`) with an existing tag: it builds and renders everything,
-but attaches nothing to a release and pushes nowhere.
-
-Everything published is generated from files in this repository — `nfpm.yaml`,
-`packaging/homebrew/yson-tools.rb.tmpl` and `packaging/aur/PKGBUILD` are the
-sources of truth, and the AUR and the tap only ever receive rendered copies of
-them. Edit them here, not there.
-
-Two repository secrets are required:
-
-| Secret | What it is |
-| --- | --- |
-| `HOMEBREW_TAP_TOKEN` | fine-grained PAT with `Contents: read and write` on `lesf0/homebrew-tap`; the tap repository has to exist |
-| `AUR_SSH_PRIVATE_KEY` | SSH private key whose public half is registered in the AUR account |
-
 ## CLI Tools for Yandex YSON manipulation
 
 ### yson-convert
 
 A tool to convert values between YSON and JSON.
-
-Installation: `go install github.com/lesf0/yson-tools/yson-convert@latest`
 
 Usage: `yson-convert [-m mode] [-f format] [-seq] value` or `echo value | yson-convert [-m mode] [-f format] [-seq]`
 
@@ -239,3 +216,36 @@ $ ysondiff <(echo '{foo=<q=w>baz}') <(echo '{foo=<q=e>bar}') -i 4 -s symmetric
     ];
 }
 ```
+
+## Releasing
+
+Publishing a GitHub release (`git tag v0.3.6 && git push origin v0.3.6`, then a
+release from that tag) runs `.github/workflows/release.yml`, which:
+
+1. builds `yson-convert` for linux/darwin on amd64/arm64 with `CGO_ENABLED=0`
+   and packs it with the three shell scripts into
+   `yson-tools-<version>-<os>-<arch>.tar.gz`,
+2. builds `.deb` and `.rpm` packages from `nfpm.yaml` for amd64 and arm64, and
+   attaches them and the tarballs to the release,
+3. renders `packaging/homebrew/yson-tools.rb.tmpl` with the new version and the
+   four tarball checksums, and pushes the result to `lesf0/homebrew-tap` as
+   `Formula/yson-tools.rb`,
+4. bumps `pkgver` in `packaging/aur/PKGBUILD`, regenerates `.SRCINFO` and pushes
+   both to [the AUR package](https://aur.archlinux.org/packages/yson-tools).
+
+Only *published* releases trigger this (a draft builds nothing). To rehearse the
+whole thing without publishing, run the workflow manually
+(`workflow_dispatch`) with an existing tag: it builds and renders everything,
+but attaches nothing to a release and pushes nowhere.
+
+Everything published is generated from files in this repository — `nfpm.yaml`,
+`packaging/homebrew/yson-tools.rb.tmpl` and `packaging/aur/PKGBUILD` are the
+sources of truth, and the AUR and the tap only ever receive rendered copies of
+them. Edit them here, not there.
+
+Two repository secrets are required:
+
+| Secret | What it is |
+| --- | --- |
+| `HOMEBREW_TAP_TOKEN` | fine-grained PAT with `Contents: read and write` on `lesf0/homebrew-tap`; the tap repository has to exist |
+| `AUR_SSH_PRIVATE_KEY` | SSH private key whose public half is registered in the AUR account |
