@@ -230,9 +230,11 @@ $ ysondiff <(echo '{foo=<q=w>baz}') <(echo '{foo=<q=e>bar}') -i 4 -s symmetric
 ## Testing
 
 `.github/workflows/test.yml` runs the Go tests and every example in the Usage
-section of this file. The examples are checked by `scripts/readme-examples.py`,
-which extracts the `$ command` lines and compares the output with what this
-README claims, so changing what a tool prints means updating this file:
+section of this file. The release workflow calls it first, so nothing is
+packaged or published unless these pass. The examples are checked by
+`scripts/readme-examples.py`, which extracts the `$ command` lines and compares
+the output with what this README claims, so changing what a tool prints means
+updating this file:
 
 ```bash
 (cd yson-convert && go build -o ../build/yson-convert .)
@@ -247,21 +249,27 @@ It needs `jq` and `jsondiff` (which ships `jdiff`), the same requirements as
 Publishing a GitHub release (`git tag v0.3.6 && git push origin v0.3.6`, then a
 release from that tag) runs `.github/workflows/release.yml`, which:
 
-1. builds `yson-convert` for linux/darwin on amd64/arm64 with `CGO_ENABLED=0`
+1. runs the tests and the README examples — the same checks a push gets — and
+   stops there if they fail,
+2. builds `yson-convert` for linux/darwin on amd64/arm64 with `CGO_ENABLED=0`
    and packs it with the three shell scripts into
    `yson-tools-<version>-<os>-<arch>.tar.gz`,
-2. builds `.deb` and `.rpm` packages from `nfpm.yaml` for amd64 and arm64, and
+3. builds `.deb` and `.rpm` packages from `nfpm.yaml` for amd64 and arm64, and
    attaches them and the tarballs to the release,
-3. renders `packaging/homebrew/yson-tools.rb.tmpl` with the new version and the
+4. renders `packaging/homebrew/yson-tools.rb.tmpl` with the new version and the
    four tarball checksums, and pushes the result to `lesf0/homebrew-tap` as
    `Formula/yson-tools.rb`,
-4. bumps `pkgver` in `packaging/aur/PKGBUILD`, regenerates `.SRCINFO` and pushes
+5. bumps `pkgver` in `packaging/aur/PKGBUILD`, regenerates `.SRCINFO` and pushes
    both to [the AUR package](https://aur.archlinux.org/packages/yson-tools).
 
 Only *published* releases trigger this (a draft builds nothing). To rehearse the
 whole thing without publishing, run the workflow manually
 (`workflow_dispatch`) with an existing tag: it builds and renders everything,
 but attaches nothing to a release and pushes nowhere.
+
+Workflows are read from the tree being released rather than from `main`, so a
+tag has to contain both of them: a tag from before `test.yml` existed cannot be
+released, since the release workflow would call a file that is not in its tree.
 
 Everything published is generated from files in this repository — `nfpm.yaml`,
 `packaging/homebrew/yson-tools.rb.tmpl` and `packaging/aur/PKGBUILD` are the

@@ -3,10 +3,14 @@ name: Test
 # Runs the Go tests and the examples in README.md against freshly built tools.
 # The examples are the documentation and, apart from yson-convert's own tests,
 # the closest thing this repository has to a test suite.
+#
+# release.yml calls this workflow, so a release cannot package or publish tools
+# that fail here.
 on:
   push:
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

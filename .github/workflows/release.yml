@@ -35,8 +35,15 @@ env:
   AUR_HOST_KEY_FINGERPRINT: "SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4"
 
 jobs:
+  # the tests and the README examples have to pass before anything is built:
+  # every other job here needs this one, directly or transitively
+  test:
+    name: Tests and README examples
+    uses: ./.github/workflows/test.yml
+
   build:
     name: Package (${{ matrix.goos }}/${{ matrix.goarch }})
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
