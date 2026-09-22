@@ -5,7 +5,8 @@ go 1.24.0
 toolchain go1.24.6
 
 require (
-	github.com/lesf0/yson-tools/pretty-formatter v0.0.0-20250922162411-e0e3a1cf0421
+	github.com/lesf0/yson-tools/pretty-formatter v0.0.0
+	github.com/lesf0/yson-tools/ysonlib v0.0.0
 	go.ytsaurus.tech/yt/go v0.0.26
 )
 
@@ -18,3 +19,9 @@ require (
 	golang.org/x/term v0.35.0
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 )
+
+// during development the tools are built from the tree they live in; a release
+// pins these to the pseudo-versions of the pushed commits instead
+replace github.com/lesf0/yson-tools/pretty-formatter => ../pretty-formatter
+
+replace github.com/lesf0/yson-tools/ysonlib => ../ysonlib

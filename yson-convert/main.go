@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	formatter "github.com/lesf0/yson-tools/pretty-formatter"
+	"github.com/lesf0/yson-tools/ysonlib"
 	"go.ytsaurus.tech/yt/go/yson"
 	"golang.org/x/term"
 )
@@ -47,7 +48,8 @@ func fromYson(s []byte) (any, error) {
 }
 
 func toYson(d any, format string) (string, error) {
-	if format == prettyFormat {
+	switch format {
+	case prettyFormat, compactFormat:
 		_, mono := os.LookupEnv("YSON_NO_COLOR")
 		_, forceColor := os.LookupEnv("YSON_FORCE_COLOR")
 		useColors := forceColor || !mono && autoColor
@@ -61,36 +63,34 @@ func toYson(d any, format string) (string, error) {
 		}
 
 		formatter := formatter.NewYsonFormatter(4, true, useColors, colorScheme)
+		formatter.Compact = format == compactFormat
 		return formatter.Dump(d), nil
-	}
 
-	var ysonFormat yson.Format
-	switch format {
-	case compactFormat:
-		ysonFormat = yson.FormatText
 	case binaryFormat:
-		ysonFormat = yson.FormatBinary
+		result, err := yson.MarshalFormat(d, yson.FormatBinary)
+		if err != nil {
+			return "", err
+		}
+		return string(result), nil
+
 	default:
 		return "", fmt.Errorf("unexpected yson format: %v", format)
 	}
-	result, err := yson.MarshalFormat(d, ysonFormat)
-	if err != nil {
-		return "", err
-	}
-	return string(result), nil
 }
 
 func fromJson(s []byte) (any, error) {
 	var jsonData any
 	decoder := json.NewDecoder(bytes.NewReader(s))
 	decoder.UseNumber()
-	err := decoder.Decode(&jsonData)
-
-	if err == nil {
-		jsonData = DenormalizeYSON(jsonData)
+	if err := decoder.Decode(&jsonData); err != nil {
+		return nil, err
 	}
 
-	return jsonData, err
+	jsonData, err := ysonlib.NumbersFromJSON(jsonData)
+	if err != nil {
+		return nil, err
+	}
+	return ysonlib.RestoreAttrs(jsonData)
 }
 
 func toJson(d any, format string) (string, error) {
@@ -105,7 +105,7 @@ func toJson(d any, format string) (string, error) {
 	default:
 		return "", fmt.Errorf("json output cannot be written in %s format", format)
 	}
-	result, err := marshaler(NormalizeYSON(d))
+	result, err := marshaler(ysonlib.FlattenAttrs(ysonlib.NumbersToJSON(d)))
 	if err != nil {
 		return "", err
 	}
