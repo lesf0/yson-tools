@@ -21,15 +21,16 @@ license: Apache-2.0
 description: |
   A set of tools for working with YSON format.
 
-  Includes yson-convert (convert values between YSON and JSON), ysonq
-  (a jq wrapper for YSON), ysondiff (a jdiff wrapper for YSON) and
-  yson-format (pretty-print a YSON file in place).
+  Includes yson-convert (convert values between YSON and JSON), ysonq (run jq
+  programs over YSON), ysondiff (a jdiff wrapper for YSON) and yson-format
+  (pretty-print a YSON file in place).
 depends:
   - bash
-  - jq
-# ysondiff needs jdiff, shipped by the jsondiff Python package. It is named
-# python3-jsondiff on Debian/Ubuntu and Fedora, but is not available everywhere,
-# so it is a weak dependency and only ysonq/yson-format work without it.
+# ysonq used to shell out to jq; it is a program of its own now, so the package
+# needs no jq installed. ysondiff needs jdiff, shipped by the jsondiff Python
+# package. It is named python3-jsondiff on Debian/Ubuntu and Fedora, but is not
+# available everywhere, so it is a weak dependency: without it everything but
+# ysondiff still works.
 recommends:
   - python3-jsondiff
 contents:
@@ -37,7 +38,7 @@ contents:
     dst: /usr/bin/yson-convert
     file_info:
       mode: 0755
-  - src: ysonq
+  - src: build/ysonq
     dst: /usr/bin/ysonq
     file_info:
       mode: 0755

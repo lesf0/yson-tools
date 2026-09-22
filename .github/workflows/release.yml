@@ -66,8 +66,13 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
+          # every module is built with the same Go version
           go-version-file: yson-convert/go.mod
-          cache-dependency-path: yson-convert/go.sum
+          cache-dependency-path: |
+            yson-convert/go.sum
+            pretty-formatter/go.sum
+            ysonlib/go.sum
+            ysonq/go.sum
 
       - name: Build yson-convert
         working-directory: yson-convert
@@ -77,13 +82,26 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: go build -trimpath -ldflags="-s -w" -o "$GITHUB_WORKSPACE/build/yson-convert" .
 
+      # -X main.version is what ysonq --version reports: a build of the tree has
+      # no version of its own
+      - name: Build ysonq
+        working-directory: ysonq
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          go build -trimpath -ldflags="-s -w -X main.version=${TAG#v}" \
+            -o "$GITHUB_WORKSPACE/build/ysonq" .
+
       - name: Build tarball
         run: |
           set -euo pipefail
           name="yson-tools-${TAG#v}-${{ matrix.goos }}-${{ matrix.goarch }}"
           mkdir -p "stage/${name}" dist
-          install -m755 build/yson-convert "stage/${name}/yson-convert"
-          install -m755 ysonq yson-format ysondiff "stage/${name}/"
+          install -m755 build/yson-convert build/ysonq "stage/${name}/"
+          install -m755 yson-format ysondiff "stage/${name}/"
           tar -czf "dist/${name}.tar.gz" -C stage "${name}"
           sha256sum "dist/${name}.tar.gz"
 

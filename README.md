@@ -1,13 +1,14 @@
 # yson-tools
 
 Command-line tools for the Yandex YSON format. `yson-convert` converts values
-between YSON and JSON, `ysonq` runs `jq` over YSON, `ysondiff` diffs two YSON
-documents and `yson-format` pretty-prints a YSON file in place.
+between YSON and JSON, `ysonq` runs jq programs over YSON, `ysondiff` diffs two
+YSON documents and `yson-format` pretty-prints a YSON file in place.
 
 ## Installation
 
-All four commands are installed together by every method below, except
-`go install`, which builds only the converter.
+All four commands are installed together by every method below. `go install`,
+being one command per module, gets you the two Go programs and not the two shell
+scripts.
 
 ### Homebrew
 
@@ -17,8 +18,8 @@ Works on macOS and Linux (amd64 and arm64):
 brew install lesf0/tap/yson-tools
 ```
 
-The formula also installs `jq` and its own copy of `jsondiff`, so `ysondiff`
-works without any further setup.
+The formula also installs its own copy of `jsondiff`, so `ysondiff` works
+without any further setup.
 
 The fully qualified name is enough to install: since Homebrew 6.0.0 non-official
 taps need to be [trusted](https://docs.brew.sh/Tap-Trust), and naming the formula
@@ -50,17 +51,23 @@ sudo dnf install ./yson-tools-0.3.6-1.x86_64.rpm
 
 ### Go
 
-Just the converter, as a Go binary:
+`yson-convert` and `ysonq` are Go programs; the other two are shell scripts and
+come with the packages and tarballs. The two share a library (`ysonlib`, which
+also holds the formatter `vscode-yson` uses), and that library lives in this
+repository rather than being a module of its own on the Go proxy, so both are
+built from a clone:
 
 ```bash
-go install github.com/lesf0/yson-tools/yson-convert@latest
+git clone https://github.com/lesf0/yson-tools
+cd yson-tools
+for module in yson-convert ysonq; do (cd "$module" && go install .); done
 ```
 
 ### Tarballs
 
 The release also carries `yson-tools-<version>-<os>-<arch>.tar.gz` for
 linux/darwin on amd64/arm64; these are what the Homebrew formula installs, and
-they work anywhere with a `bash` and a `jq`:
+they work anywhere with a `bash`:
 
 ```bash
 tar -xzf yson-tools-0.3.6-linux-amd64.tar.gz
@@ -69,12 +76,13 @@ install -m755 yson-tools-0.3.6-linux-amd64/* ~/.local/bin/
 
 ### Requirements
 
-The `.deb`/`.rpm` packages depend on `jq` and recommend `jsondiff`; the AUR
-package depends on both, and the Homebrew formula bundles its own copy of
-`jsondiff`. `ysondiff` needs `jdiff` from `jsondiff` (`python-jsondiff` on Arch,
-`python3-jsondiff` on Debian/Ubuntu/Fedora); it falls back to `jsondiff-jdiff`
-and `python3 -m jsondiff.cli` where that name is packaged differently, and tells
-you what to install if it finds none.
+`yson-convert` and `ysonq` are self-contained binaries; `yson-format` and
+`ysondiff` are shell scripts that call them. `ysondiff` needs `jdiff` from
+`jsondiff` (`python-jsondiff` on Arch, `python3-jsondiff` on
+Debian/Ubuntu/Fedora), so the `.deb`/`.rpm` packages recommend it and the
+Homebrew formula bundles its own copy; it falls back to `jsondiff-jdiff` and
+`python3 -m jsondiff.cli` where that name is packaged differently, and tells you
+what to install if it finds none. Nothing needs `jq`.
 
 ## Usage
 
@@ -158,11 +166,57 @@ $ cat my-yson-file.yson
 
 ### ysonq
 
-A wrapper script for `jq` which converts input stream to JSON and back via `yson-convert`, effectively allowing to use `jq` with YSON with almost no downsides.
+`ysonq` is `jq` for YSON: it reads YSON values, runs a jq program over each of
+them, and writes the result back as YSON.
 
-By default, `ysonq` tries to convert `jq`'s output back to YSON / YSON*L*, but won't do so if it seems impossible (i.e. -r string literals).
+It is not a wrapper around `jq`: the language comes from
+[gojq](https://github.com/itchyny/gojq) and the format handling from the same
+library `yson-convert` uses, so nothing is converted through JSON on the way and
+no `jq` has to be installed. Values JSON cannot hold survive the trip, and a
+document that does not parse is reported with its place in the input.
 
-Some of `jq`'s flags (namely, format/stream stuff) are not supported yet, I'd like to support them all eventually and I'm open for pull requests.
+A value carrying attributes is the `Attrs`/`Value` map `yson-convert` writes, so
+`.foo.bar.Attrs.q` is the attribute `q` of `.foo.bar`. Attributes are written by
+building that map — with `.foo` itself when nothing else is on the value, or on
+the existing `.foo.Attrs` when something is:
+
+```bash
+$ echo '{foo=1}' | ysonq -c '.foo = {Attrs:{q:"e"}, Value:.foo}'
+{foo=<q=e;>1;}
+
+$ echo '{foo=<q=e>1}' | ysonq -c '.foo.Attrs.q = "w"'
+{foo=<q=w;>1;}
+```
+
+The first form replaces the whole map, so it drops any attribute that was there;
+the second keeps them. A YSON map of your own that happens to have `Attrs` and
+`Value` keys reads as the attributed value it looks like — the same ambiguity
+`yson-convert` has.
+
+The input is a stream of YSON documents separated by whitespace or `;`, so a
+file with one value per line works as it is. `--seq` reads the RS-separated form
+(a `\x1e` before each document) and writes it back, `--stream` reads `[path,
+leaf]` pairs, and `-R` reads lines of text instead of YSON.
+
+The output is always YSON: pretty-printed with four spaces per level unless `-c`
+asks for one value per line, with the keys of an object in order (`-S` is
+accepted and does nothing, as they are always in order), coloured only when
+writing to a terminal unless `-C`/`-M` or the toolkit's colour variables say
+otherwise. An integer that does not fit into YSON's 64 bits is refused rather
+than rounded off, and `--raw-output0` refuses a string containing a NUL rather
+than writing a stream nothing can read back.
+
+`ysonq --help` lists the flags, which are `jq`'s, including `--argjson`,
+`--argyson`, `--ysonargs`, `--slurpfile`, `--rawfile`, `-L` for modules, `-f` and
+`-e`. The four that are not implemented — `--yaml-input`, `--yaml-output`,
+`--stream-errors` and `-a`/`--ascii-output` — are refused with an error instead
+of being quietly ignored.
+
+The exit codes are `jq`'s: 0 when the run succeeded, 1 with `-e` if the last
+value was false or null, 2 for a command line that cannot be used (an input file
+that cannot be opened included), 3 for a program that does not compile, 4 with
+`-e` if nothing was output at all, and 5 for a document that does not parse or a
+program that fails while running.
 
 Examples :
 
@@ -224,6 +278,12 @@ $ seq 1 5 | ysonq -s
     4;
     5;
 ]
+
+# Values JSON cannot hold come back as themselves
+$ ysonq -n -c 'nan, infinite, 18446744073709551615'
+%nan
+%inf
+18446744073709551615u
 ```
 
 ### ysondiff
@@ -249,20 +309,22 @@ $ ysondiff <(echo '{foo=<q=w>baz}') <(echo '{foo=<q=e>bar}') -i 4 -s symmetric
 
 ## Testing
 
-`.github/workflows/test.yml` runs the Go tests and every example in the Usage
-section of this file. The release workflow calls it first, so nothing is
-packaged or published unless these pass. The examples are checked by
+`.github/workflows/test.yml` runs the Go tests of every module and every example
+in the Usage section of this file. The release workflow calls it first, so
+nothing is packaged or published unless these pass. The examples are checked by
 `scripts/readme-examples.py`, which extracts the `$ command` lines and compares
 the output with what this README claims, so changing what a tool prints means
 updating this file:
 
 ```bash
-(cd yson-convert && go build -o ../build/yson-convert .)
+for module in yson-convert ysonq; do (cd "$module" && go build -o ../build/ .); done
 ./scripts/readme-examples.py
 ```
 
-It needs `jq` and `jsondiff` (which ships `jdiff`), the same requirements as
-`ysondiff` itself, and looks for the tools in `./build` and next to this file.
+The examples need `jsondiff` (which ships `jdiff`), the same requirement
+`ysondiff` itself has, and look for the tools in `./build` and next to this file.
+The Go tests are run per module, since the tree holds four of them:
+pretty-formatter, ysonlib, yson-convert and ysonq.
 
 ## Releasing
 
@@ -271,8 +333,9 @@ release from that tag) runs `.github/workflows/release.yml`, which:
 
 1. runs the tests and the README examples — the same checks a push gets — and
    stops there if they fail,
-2. builds `yson-convert` for linux/darwin on amd64/arm64 with `CGO_ENABLED=0`
-   and packs it with the three shell scripts into
+2. builds `yson-convert` and `ysonq` for linux/darwin on amd64/arm64 with
+   `CGO_ENABLED=0` (`ysonq` with `-X main.version=<tag>`, which is what
+   `ysonq --version` reports) and packs them with the two shell scripts into
    `yson-tools-<version>-<os>-<arch>.tar.gz`,
 3. builds `.deb` and `.rpm` packages from `nfpm.yaml` for amd64 and arm64, and
    attaches them and the tarballs to the release,

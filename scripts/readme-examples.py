@@ -11,8 +11,8 @@ Within a block a line starting with `#` is a caption, not output, and ends the
 example before it.
 
 Commands run with bash in a scratch directory per block, with the repository
-root (the three shell scripts) and ./build (where README.md and the release
-workflow build yson-convert into) on PATH.
+root (the two shell scripts) and ./build (where README.md, the test workflow and
+the release workflow build yson-convert and ysonq into) on PATH.
 """
 
 from __future__ import annotations

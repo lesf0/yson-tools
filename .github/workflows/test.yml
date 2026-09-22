@@ -24,12 +24,21 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
+          # every module is built with the same Go version
           go-version-file: yson-convert/go.mod
-          cache-dependency-path: yson-convert/go.sum
+          cache-dependency-path: |
+            yson-convert/go.sum
+            pretty-formatter/go.sum
+            ysonlib/go.sum
+            ysonq/go.sum
 
       - name: Go tests
-        working-directory: yson-convert
-        run: go test ./...
+        run: |
+          set -euo pipefail
+          for module in pretty-formatter ysonlib yson-convert ysonq; do
+            echo "== $module"
+            (cd "$module" && go test ./...)
+          done
 
       - name: Build yson-convert
         working-directory: yson-convert
@@ -37,12 +46,18 @@ jobs:
           CGO_ENABLED: "0"
         run: go build -trimpath -ldflags="-s -w" -o "$GITHUB_WORKSPACE/build/yson-convert" .
 
+      - name: Build ysonq
+        working-directory: ysonq
+        env:
+          CGO_ENABLED: "0"
+        run: go build -trimpath -ldflags="-s -w" -o "$GITHUB_WORKSPACE/build/ysonq" .
+
       # ysondiff shells out to jdiff, which the jsondiff python package ships
-      - name: Install jq and jsondiff
+      - name: Install jsondiff
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends jq python3-venv
+          sudo apt-get install -y --no-install-recommends python3-venv
           python3 -m venv "$RUNNER_TEMP/jsondiff"
           "$RUNNER_TEMP/jsondiff/bin/pip" install --quiet jsondiff pyyaml
           echo "$RUNNER_TEMP/jsondiff/bin" >> "$GITHUB_PATH"
